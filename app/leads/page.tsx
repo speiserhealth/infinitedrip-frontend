@@ -17,8 +17,6 @@ type Lead = {
   lastMessageAt?: string | null;
   inboundCount?: number | null;
   source?: string | null;
-  source?: string | null;
-  source?: string | null;
 };
 
 type LeadsResponse = {
