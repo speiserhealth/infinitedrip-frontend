@@ -1,0 +1,36 @@
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+
+const handler = NextAuth({
+  providers: [
+    Credentials({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = String(credentials?.email || "").trim().toLowerCase();
+        const password = String(credentials?.password || "").trim();
+
+        if (!email || !password) return null;
+
+        // TEMP AUTH (dev): any non-empty email/password works
+        return { id: email, name: email, email };
+      },
+    }),
+  ],
+  session: { strategy: "jwt" },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user?.id) token.userId = String(user.id);
+      return token;
+    },
+    async session({ session, token }) {
+      (session as any).userId = token.userId || "demo";
+      return session;
+    },
+  },
+});
+
+export { handler as GET, handler as POST };
