@@ -112,7 +112,7 @@ type SortKey = "newest" | "oldest";
 export default function PipelinePage() {
   const API_BASE =
     (process.env.NEXT_PUBLIC_API_BASE && process.env.NEXT_PUBLIC_API_BASE.trim()) ||
-    "http://localhost:4000";
+    "https://infinitedrip-backend.onrender.com";
 
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [error, setError] = React.useState("");

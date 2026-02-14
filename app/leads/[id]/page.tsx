@@ -54,7 +54,7 @@ export default function LeadThreadPage() {
 
   const API_BASE =
     (process.env.NEXT_PUBLIC_API_BASE && process.env.NEXT_PUBLIC_API_BASE.trim()) ||
-    "http://localhost:4000";
+    "https://infinitedrip-backend.onrender.com";
 
   const [lead, setLead] = React.useState<Lead | null>(null);
   const [messages, setMessages] = React.useState<Msg[]>([]);
