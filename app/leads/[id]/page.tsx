@@ -75,7 +75,7 @@ export default function LeadThreadPage() {
   async function loadThread() {
     if (!leadId) return;
 
-    const lr = await fetch(`${API_BASE}/api/leads`, { cache: "no-store" });
+    const lr = await apiFetch(`${API_BASE}/api/leads`, { cache: "no-store" });
     const ldata = await lr.json();
     const list: Lead[] = Array.isArray(ldata) ? ldata : ldata?.leads ?? [];
     const found = list.find((x) => String(x.id) === String(leadId)) || null;
@@ -87,7 +87,7 @@ export default function LeadThreadPage() {
       setNotesDraft((prev) => (prev === "" ? found.notes || "" : prev));
     }
 
-    const mr = await fetch(`${API_BASE}/api/leads/${leadId}/messages`, { cache: "no-store" });
+    const mr = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages`, { cache: "no-store" });
     const mdata = await mr.json();
     const msgs: Msg[] = Array.isArray(mdata) ? mdata : mdata?.messages ?? [];
     setMessages(msgs);
@@ -129,7 +129,7 @@ export default function LeadThreadPage() {
     try {
       setSending(true);
 
-      const r = await fetch(`${API_BASE}/api/leads/${leadId}/messages`, {
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: newMessage }),
@@ -152,7 +152,7 @@ export default function LeadThreadPage() {
     try {
       setUpdatingStatus(true);
 
-      const r = await fetch(`${API_BASE}/api/leads/${leadId}`, {
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: next }),
@@ -174,7 +174,7 @@ export default function LeadThreadPage() {
     try {
       setUpdatingAi(true);
 
-      const r = await fetch(`${API_BASE}/api/leads/${leadId}/ai`, {
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/ai`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
@@ -196,7 +196,7 @@ export default function LeadThreadPage() {
     try {
       setSavingNotes(true);
 
-      const r = await fetch(`${API_BASE}/api/leads/${leadId}/notes`, {
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/notes`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: notesDraft }),
@@ -346,3 +346,4 @@ export default function LeadThreadPage() {
     </div>
   );
 }
+import { apiFetch } from "@/lib/apiFetch";
