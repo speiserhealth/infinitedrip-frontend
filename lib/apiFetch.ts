@@ -19,12 +19,24 @@ export async function apiFetch(url: string, init: RequestInit = {}) {
     (session as any)?.accessToken ||
     "";
 
+  // Use email as the user id (matches your “username field is driven by @ emails” setup)
+  const userId =
+    (session as any)?.user?.email ||
+    "";
+
   const headers = new Headers(init.headers || {});
+
   if (!headers.has("Content-Type") && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (token) {
+  // Backend multi-user header
+  if (userId && !headers.has("x-user-id")) {
+    headers.set("x-user-id", userId);
+  }
+
+  // Keep bearer token too (won't hurt; helps later if you switch backend auth)
+  if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 

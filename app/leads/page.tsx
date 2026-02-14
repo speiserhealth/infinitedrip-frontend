@@ -105,10 +105,6 @@ function renderSourceBadge(v?: string | null) {
 type SortKey = "newest" | "oldest";
 
 export default function LeadsPage() {
-  const API_BASE =
-    (process.env.NEXT_PUBLIC_API_BASE && process.env.NEXT_PUBLIC_API_BASE.trim()) ||
-    "http://localhost:4000";
-
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [counts, setCounts] = React.useState<Record<string, number> | null>(null);
   const [error, setError] = React.useState("");
@@ -124,8 +120,8 @@ export default function LeadsPage() {
   const [importResult, setImportResult] = React.useState<string>("");
 
   async function loadLeads() {
-    const r = await apiFetch(`${API_BASE}/api/leads`, { cache: "no-store" });
-    if (!r.ok) throw new Error("Failed to load leads");
+    const r = await apiFetch(`/api/leads`, { cache: "no-store" });
+    if (!r.ok) throw new Error("Failed to load leads (" + r.status + ")");
     const data: any = await r.json();
 
     const list: Lead[] = Array.isArray(data) ? data : (data as LeadsResponse)?.leads ?? [];
@@ -142,8 +138,9 @@ export default function LeadsPage() {
       try {
         await loadLeads();
         if (!dead) setError("");
-      } catch {
-        if (!dead) setError("Load failed");
+      } catch (e) {
+        const msg = (e && e.message) ? e.message : "Load failed";
+        if (!dead) setError(msg);
       }
     }
 
@@ -154,7 +151,7 @@ export default function LeadsPage() {
       dead = true;
       clearInterval(t);
     };
-  }, [API_BASE]);
+  }, []);
 
   async function handleAddLead(e: React.FormEvent) {
     e.preventDefault();
@@ -164,7 +161,7 @@ export default function LeadsPage() {
       setAdding(true);
       setError("");
 
-      const r = await apiFetch(`${API_BASE}/api/leads`, {
+      const r = await apiFetch(`/api/leads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, phone }),
@@ -194,7 +191,7 @@ export default function LeadsPage() {
       const fd = new FormData();
       fd.append("file", file);
 
-      const r = await apiFetch(`${API_BASE}/api/leads/import`, {
+      const r = await apiFetch(`/api/leads/import`, {
         method: "POST",
         body: fd,
       });
@@ -258,15 +255,15 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Leads</h1>
           {counts ? (
-            <div className="text-sm text-gray-500">
-              new: {counts.new ?? 0} • contacted: {counts.contacted ?? 0} • booked: {counts.booked ?? 0} • sold: {counts.sold ?? 0} • dead: {counts.dead ?? 0}
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-700">
+              {Object.entries(counts).map(([k, v]) => (
+                <span key={k} className="px-2 py-1 rounded border bg-gray-50">
+                  {k}: <span className="font-semibold">{v}</span>
+                </span>
+              ))}
             </div>
           ) : null}
-          <div className="text-sm mt-1">
-            <Link href="/pipeline" className="text-blue-600 underline">
-              View Funnel
-            </Link>
-          </div>
+          {error ? <div className="mt-2 text-sm text-red-600">{error}</div> : null}
         </div>
 
         <div className="flex items-center gap-3">
@@ -279,134 +276,137 @@ export default function LeadsPage() {
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
           </select>
+
+          <Link href="/pipeline" className="text-blue-600 underline">
+            Funnel
+          </Link>
+          <Link href="/stats" className="text-blue-600 underline">
+            Stats
+          </Link>
+          <Link href="/dashboard" className="text-blue-600 underline">
+            Dashboard
+          </Link>
         </div>
       </div>
 
-      {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <form onSubmit={handleAddLead} className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm font-medium mb-3">Add Lead</div>
-
-          <div className="space-y-2">
+          <div className="font-medium mb-2">Add lead</div>
+          <div className="grid grid-cols-1 gap-2">
             <input
+              className="border rounded px-3 py-2"
+              placeholder="Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Name (optional)"
-              className="w-full border rounded px-3 py-2"
             />
             <input
+              className="border rounded px-3 py-2"
+              placeholder="Phone (required)"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone (required)"
-              className="w-full border rounded px-3 py-2"
             />
+            <button
+              disabled={adding}
+              className="border rounded px-3 py-2 bg-gray-50 hover:bg-gray-100"
+              type="submit"
+            >
+              {adding ? "Adding…" : "Add"}
+            </button>
           </div>
-
-          <button
-            type="submit"
-            disabled={adding}
-            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded"
-          >
-            {adding ? "Adding..." : "Add Lead"}
-          </button>
         </form>
 
         <form onSubmit={handleImport} className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm font-medium mb-3">Import CSV</div>
-
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="w-full"
-          />
-
-          <button
-            type="submit"
-            disabled={importing || !file}
-            className="mt-3 border px-4 py-2 rounded"
-          >
-            {importing ? "Importing..." : "Upload CSV"}
-          </button>
-
-          {importResult ? <div className="mt-2 text-sm text-gray-600">{importResult}</div> : null}
+          <div className="font-medium mb-2">Import CSV</div>
+          <div className="text-xs text-gray-500 mb-2">
+            CSV columns: name, phone
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              disabled={importing || !file}
+              className="border rounded px-3 py-2 bg-gray-50 hover:bg-gray-100"
+              type="submit"
+            >
+              {importing ? "Importing…" : "Import"}
+            </button>
+            {importResult ? <div className="text-xs text-green-700">{importResult}</div> : null}
+          </div>
         </form>
       </div>
 
-      <div className="space-y-3">
-        {sortedLeads.length === 0 ? (
-          <div className="text-gray-500">No leads yet.</div>
-        ) : (
-          sortedLeads.map((l) => {
-            const st = normalizeStatus(l.status);
-            const waiting = l.lastMessageDirection === "in";
-            const hot = Number(l.inboundCount ?? 0) >= 3;
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b font-medium">
+          {sortedLeads.length} lead{sortedLeads.length === 1 ? "" : "s"}
+        </div>
 
-            const createdMs = toDateSafe(l.createdAt);
-            const ageMs = createdMs ? Date.now() - createdMs : 0;
-            const cold =
-              (st === "new" && ageMs >= 24 * 60 * 60 * 1000) ||
-              (st === "contacted" && ageMs >= 3 * 24 * 60 * 60 * 1000);
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="text-left px-4 py-2">Lead</th>
+                <th className="text-left px-4 py-2">Status</th>
+                <th className="text-left px-4 py-2">Source</th>
+                <th className="text-left px-4 py-2">Created</th>
+                <th className="text-left px-4 py-2">Age</th>
+                <th className="text-left px-4 py-2">Last msg</th>
+                <th className="text-right px-4 py-2">Inbound</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedLeads.map((l) => {
+                const st = normalizeStatus(l.status);
+                const cls = STATUS_STYLE[st];
 
-            const cardClass = waiting
-              ? "bg-orange-50 border-orange-300"
-              : hot
-              ? "bg-red-50 border-red-300"
-              : cold
-              ? "bg-blue-50 border-blue-300"
-              : "bg-white";
+                const waiting = l.lastMessageDirection === "in";
+                const hot = Number(l.inboundCount ?? 0) >= 3;
 
-            return (
-              <Link
-                key={l.id}
-                href={`/leads/${l.id}`}
-                className={`block border rounded-lg p-4 shadow-sm hover:shadow transition ${cardClass}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-lg font-medium">{l.name || l.phone || `Lead #${l.id}`}</div>
+                return (
+                  <tr key={l.id} className="border-t hover:bg-gray-50">
+                    <td className="px-4 py-2">
+                      <div className="flex flex-col">
+                        <Link className="text-blue-600 underline" href={`/leads/${l.id}`}>
+                          {l.name || l.phone || `Lead #${l.id}`}
+                        </Link>
+                        <div className="text-xs text-gray-500">{l.phone}</div>
+                      </div>
+                    </td>
 
-                      {waiting ? (
-                        <span className="text-[11px] px-2 py-1 rounded border bg-orange-100 text-orange-800 border-orange-300">
-                          WAITING
-                        </span>
-                      ) : null}
+                    <td className="px-4 py-2">
+                      <span className={`inline-flex items-center gap-2 border rounded px-2 py-1 text-xs ${cls}`}>
+                        {st}
+                        {waiting ? <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">waiting</span> : null}
+                        {hot ? <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">hot</span> : null}
+                      </span>
+                    </td>
 
-                      {hot ? (
-                        <span className="text-[11px] px-2 py-1 rounded border bg-red-100 text-red-800 border-red-300">
-                          HOT
-                        </span>
-                      ) : null}
+                    <td className="px-4 py-2">{renderSourceBadge(l.source)}</td>
 
-                      {!waiting && !hot && cold ? (
-                        <span className="text-[11px] px-2 py-1 rounded border bg-blue-100 text-blue-900 border-blue-300">
-                          COLD
-                        </span>
-                      ) : null}
+                    <td className="px-4 py-2 text-gray-700">{formatCreated(l.createdAt)}</td>
+                    <td className="px-4 py-2 text-gray-700">{formatAge(l.createdAt)}</td>
 
-                      {renderSourceBadge(l.source)}
-                    </div>
+                    <td className="px-4 py-2 text-gray-700">
+                      {l.lastMessageAt ? formatCreated(l.lastMessageAt) : "-"}
+                    </td>
 
-                    <div className="text-sm text-gray-500">{l.phone}</div>
+                    <td className="px-4 py-2 text-right">{Number(l.inboundCount ?? 0)}</td>
+                  </tr>
+                );
+              })}
 
-                    <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      <span>Created: {formatCreated(l.createdAt)}</span>
-                      <span>Age: {formatAge(l.createdAt)}</span>
-                      {l.lastMessageAt ? <span>Last msg: {formatCreated(l.lastMessageAt)}</span> : null}
-                      <span>Inbound: {Number(l.inboundCount ?? 0)}</span>
-                    </div>
-                  </div>
-
-                  <span className={`text-xs px-2 py-1 rounded border ${STATUS_STYLE[st]}`}>
-                    {st.toUpperCase()}
-                  </span>
-                </div>
-              </Link>
-            );
-          })
-        )}
+              {sortedLeads.length === 0 ? (
+                <tr className="border-t">
+                  <td className="px-4 py-6 text-sm text-gray-500" colSpan={7}>
+                    No leads yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
