@@ -138,7 +138,7 @@ export default function LeadsPage() {
       try {
         await loadLeads();
         if (!dead) setError("");
-      } catch (e) {
+      } catch (e: any) {
         const msg = (e && e.message) ? e.message : "Load failed";
         if (!dead) setError(msg);
       }
