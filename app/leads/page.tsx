@@ -104,6 +104,36 @@ function renderSourceBadge(v?: string | null) {
 
 type SortKey = "newest" | "oldest";
 
+async function readResponseError(r: Response): Promise<string> {
+  const ct = (r.headers.get("content-type") || "").toLowerCase();
+
+  // Try text first (works for both JSON + HTML)
+  const text = await r.text().catch(() => "");
+
+  // If it's HTML, surface that clearly (usually means we hit Next.js instead of backend)
+  if (ct.includes("text/html") || text.trim().startsWith("<!DOCTYPE html")) {
+    return "Server returned HTML (wrong route / proxy / auth).";
+  }
+
+  // If JSON, try to extract a useful message
+  if (ct.includes("application/json")) {
+    try {
+      const j = JSON.parse(text || "{}");
+      const msg =
+        j?.error ||
+        j?.message ||
+        j?.detail ||
+        j?.errors?.[0]?.message ||
+        "";
+      return msg ? String(msg) : (text || "Request failed");
+    } catch {
+      return text || "Request failed";
+    }
+  }
+
+  return text || "Request failed";
+}
+
 export default function LeadsPage() {
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [counts, setCounts] = React.useState<Record<string, number> | null>(null);
@@ -121,9 +151,13 @@ export default function LeadsPage() {
 
   async function loadLeads() {
     const r = await apiFetch(`/api/leads`, { cache: "no-store" });
-    if (!r.ok) throw new Error("Failed to load leads (" + r.status + ")");
-    const data: any = await r.json();
+    if (!r.ok) {
+      const details = await readResponseError(r);
+      const url = (r as any)?.url ? String((r as any).url) : "unknown-url";
+      throw new Error(`Failed to load leads (${r.status}) [${url}]: ${details}`);
+    }
 
+    const data: any = await r.json();
     const list: Lead[] = Array.isArray(data) ? data : (data as LeadsResponse)?.leads ?? [];
     const c = Array.isArray(data) ? null : (data as LeadsResponse)?.counts ?? null;
 
@@ -137,9 +171,21 @@ export default function LeadsPage() {
     async function tick() {
       try {
         await loadLeads();
-        if (!dead) setError("");
+        if (!dead) {
+          setError((prev) => {
+            const p = String(prev || "");
+            if (
+              p.startsWith("Load failed") ||
+              p.startsWith("Failed to load leads") ||
+              p.includes("Failed to load leads (")
+            ) {
+              return "";
+            }
+            return p;
+          });
+        }
       } catch (e: any) {
-        const msg = (e && e.message) ? e.message : "Load failed";
+        const msg = e?.message ? String(e.message) : "Load failed";
         if (!dead) setError(msg);
       }
     }
@@ -167,13 +213,31 @@ export default function LeadsPage() {
         body: JSON.stringify({ name, phone }),
       });
 
-      if (!r.ok) throw new Error("Add lead failed");
+      if (!r.ok) {
+        const details = await readResponseError(r);
+        const url = (r as any)?.url ? String((r as any).url) : "unknown-url";
+        throw new Error(`Add lead failed (${r.status}) [${url}]: ${details}`);
+      }
+
+      const created: any = await r.json().catch(() => null);
+
+      // Optimistic UI: insert immediately so it shows up even if the poll races.
+      if (created && typeof created === "object") {
+        setLeads((prev) => {
+          const id = Number((created as any).id || 0);
+          const filtered = id ? prev.filter((x: any) => Number((x as any).id || 0) !== id) : prev;
+          return [created as any, ...filtered];
+        });
+      }
 
       setName("");
       setPhone("");
-      await loadLeads();
-    } catch {
-      setError("Add lead failed");
+
+      // Refresh from server in background (keeps counts accurate)
+      loadLeads().catch(() => {});
+    } catch (e: any) {
+      const msg = e?.message ? String(e.message) : "Add lead failed";
+      setError(msg);
     } finally {
       setAdding(false);
     }
@@ -196,15 +260,20 @@ export default function LeadsPage() {
         body: fd,
       });
 
-      if (!r.ok) throw new Error("Import failed");
+      if (!r.ok) {
+        const details = await readResponseError(r);
+        const url = (r as any)?.url ? String((r as any).url) : "unknown-url";
+        throw new Error(`CSV import failed (${r.status}) [${url}]: ${details}`);
+      }
 
-      const data = await r.json();
+      const data: any = await r.json().catch(() => ({}));
       setImportResult(`Imported ${data.imported ?? "?"}. Total ${data.total ?? "?"}.`);
       setFile(null);
 
       await loadLeads();
-    } catch {
-      setError("CSV import failed");
+    } catch (e: any) {
+      const msg = e?.message ? String(e.message) : "CSV import failed";
+      setError(msg);
     } finally {
       setImporting(false);
     }
@@ -317,9 +386,7 @@ export default function LeadsPage() {
 
         <form onSubmit={handleImport} className="border rounded-lg p-4 bg-white shadow-sm">
           <div className="font-medium mb-2">Import CSV</div>
-          <div className="text-xs text-gray-500 mb-2">
-            CSV columns: name, phone
-          </div>
+          <div className="text-xs text-gray-500 mb-2">CSV columns: name, phone</div>
           <div className="grid grid-cols-1 gap-2">
             <input
               type="file"
@@ -378,8 +445,12 @@ export default function LeadsPage() {
                     <td className="px-4 py-2">
                       <span className={`inline-flex items-center gap-2 border rounded px-2 py-1 text-xs ${cls}`}>
                         {st}
-                        {waiting ? <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">waiting</span> : null}
-                        {hot ? <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">hot</span> : null}
+                        {waiting ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">waiting</span>
+                        ) : null}
+                        {hot ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">hot</span>
+                        ) : null}
                       </span>
                     </td>
 
