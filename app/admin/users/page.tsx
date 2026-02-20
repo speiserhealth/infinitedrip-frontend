@@ -24,6 +24,12 @@ type AdminStatus = {
     approved?: number;
     rejected?: number;
   };
+  setup_checks?: Array<{
+    key: string;
+    label: string;
+    status: "green" | "yellow" | "red" | string;
+    detail?: string;
+  }>;
 };
 
 type InviteRow = {
@@ -45,6 +51,13 @@ function fmtDate(v?: string | null) {
   const d = new Date(v.includes("T") ? v : `${v.replace(" ", "T")}Z`);
   if (Number.isNaN(d.getTime())) return String(v);
   return d.toLocaleString();
+}
+
+function healthClass(status?: string) {
+  const s = String(status || "").toLowerCase();
+  if (s === "green") return "border-green-300 bg-green-50 text-green-800";
+  if (s === "red") return "border-red-300 bg-red-50 text-red-800";
+  return "border-yellow-300 bg-yellow-50 text-yellow-800";
 }
 
 export default function AdminUsersPage() {
@@ -181,6 +194,18 @@ export default function AdminUsersPage() {
             {status.email_configured ? "Configured" : "Not configured"}
           </div>
           <div className="text-xs text-gray-500">{status.email_from || "Set EMAIL_FROM + RESEND_API_KEY"}</div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+        <h2 className="text-lg font-medium">Setup Health</h2>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {(status.setup_checks || []).map((c) => (
+            <div key={c.key} className={`rounded border px-3 py-2 text-sm ${healthClass(c.status)}`}>
+              <div className="font-medium">{c.label}</div>
+              <div className="text-xs opacity-90">{c.detail || ""}</div>
+            </div>
+          ))}
         </div>
       </div>
 
