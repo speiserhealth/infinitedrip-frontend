@@ -17,6 +17,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [website, setWebsite] = useState("");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -43,6 +44,7 @@ export default function SignupPage() {
           phone,
           email,
           password,
+          website,
           agreementAccepted,
         }),
       });
@@ -64,6 +66,7 @@ export default function SignupPage() {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+      setWebsite("");
       setAgreementAccepted(false);
     } finally {
       setLoading(false);
@@ -90,6 +93,15 @@ export default function SignupPage() {
               placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            <input
+              type="text"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              autoComplete="off"
+              tabIndex={-1}
+              className="hidden"
+              aria-hidden="true"
             />
 
             <label className="flex items-start gap-2 text-sm text-gray-700">
