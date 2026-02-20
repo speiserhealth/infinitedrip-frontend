@@ -364,14 +364,14 @@ export default function LeadsPage() {
   }, [leads, sort]);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <div className="p-4 md:p-5 max-w-6xl mx-auto">
+      <div className="mb-3 flex flex-col md:flex-row md:items-start md:justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Leads</h1>
           {counts ? (
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-700">
+            <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-gray-700">
               {Object.entries(counts).map(([k, v]) => (
-                <span key={k} className="px-2 py-1 rounded border bg-gray-50">
+                <span key={k} className="px-1.5 py-0.5 rounded border bg-gray-50">
                   {k}: <span className="font-semibold">{v}</span>
                 </span>
               ))}
@@ -380,48 +380,48 @@ export default function LeadsPage() {
           {error ? <div className="mt-2 text-sm text-red-600">{error}</div> : null}
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-sm text-gray-600">Sort</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-xs text-gray-600">Sort</div>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="border rounded px-2 py-2 text-sm"
+            className="border rounded px-2 py-1.5 text-xs"
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
           </select>
 
-          <Link href="/pipeline" className="text-blue-600 underline">
+          <Link href="/pipeline" className="text-sm text-blue-600 underline">
             Funnel
           </Link>
-          <Link href="/stats" className="text-blue-600 underline">
+          <Link href="/stats" className="text-sm text-blue-600 underline">
             Stats
           </Link>
-          <Link href="/dashboard" className="text-blue-600 underline">
+          <Link href="/dashboard" className="text-sm text-blue-600 underline">
             Dashboard
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <form onSubmit={handleAddLead} className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="font-medium mb-2">Add lead</div>
-          <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <form onSubmit={handleAddLead} className="border rounded-lg p-3 bg-white shadow-sm">
+          <div className="font-medium mb-1.5 text-sm">Add lead</div>
+          <div className="grid grid-cols-1 gap-1.5">
             <input
-              className="border rounded px-3 py-2"
+              className="border rounded px-2.5 py-1.5 text-sm"
               placeholder="Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
             <input
-              className="border rounded px-3 py-2"
+              className="border rounded px-2.5 py-1.5 text-sm"
               placeholder="Phone (required)"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
             <button
               disabled={adding}
-              className="border rounded px-3 py-2 bg-gray-50 hover:bg-gray-100"
+              className="border rounded px-3 py-1.5 text-sm bg-gray-50 hover:bg-gray-100"
               type="submit"
             >
               {adding ? "Adding…" : "Add"}
@@ -429,18 +429,19 @@ export default function LeadsPage() {
           </div>
         </form>
 
-        <form onSubmit={handleImport} className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="font-medium mb-2">Import CSV</div>
-          <div className="text-xs text-gray-500 mb-2">CSV columns: name, phone</div>
-          <div className="grid grid-cols-1 gap-2">
+        <form onSubmit={handleImport} className="border rounded-lg p-3 bg-white shadow-sm">
+          <div className="font-medium mb-1.5 text-sm">Import CSV</div>
+          <div className="text-xs text-gray-500 mb-1.5">CSV columns: name, phone</div>
+          <div className="grid grid-cols-1 gap-1.5">
             <input
               type="file"
               accept=".csv,text/csv"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-sm"
             />
             <button
               disabled={importing || !file}
-              className="border rounded px-3 py-2 bg-gray-50 hover:bg-gray-100"
+              className="border rounded px-3 py-1.5 text-sm bg-gray-50 hover:bg-gray-100"
               type="submit"
             >
               {importing ? "Importing…" : "Import"}
@@ -451,22 +452,22 @@ export default function LeadsPage() {
       </div>
 
       <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b font-medium">
+        <div className="px-3 py-2 border-b font-medium text-sm">
           {sortedLeads.length} lead{sortedLeads.length === 1 ? "" : "s"}
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs md:text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <th className="text-left px-4 py-2">Lead</th>
-                <th className="text-left px-4 py-2">Status</th>
-                <th className="text-left px-4 py-2">Source</th>
-                <th className="text-left px-4 py-2">Created</th>
-                <th className="text-left px-4 py-2">Age</th>
-                <th className="text-left px-4 py-2">Last msg</th>
-                <th className="text-right px-4 py-2">Inbound</th>
-                <th className="text-right px-4 py-2">Actions</th>
+                <th className="text-left px-3 py-1.5">Lead</th>
+                <th className="text-left px-3 py-1.5">Status</th>
+                <th className="text-left px-3 py-1.5">Source</th>
+                <th className="text-left px-3 py-1.5">Created</th>
+                <th className="text-left px-3 py-1.5">Age</th>
+                <th className="text-left px-3 py-1.5">Last msg</th>
+                <th className="text-right px-3 py-1.5">Inbound</th>
+                <th className="text-right px-3 py-1.5">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -479,42 +480,42 @@ export default function LeadsPage() {
 
                 return (
                   <tr key={l.id} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-1.5">
                       <div className="flex flex-col">
-                        <Link className="text-blue-600 underline" href={`/leads/${l.id}`}>
+                        <Link className="text-blue-600 underline leading-tight" href={`/leads/${l.id}`}>
                           {l.name || l.phone || `Lead #${l.id}`}
                         </Link>
-                        <div className="text-xs text-gray-500">{l.phone}</div>
+                        <div className="text-[11px] text-gray-500">{l.phone}</div>
                       </div>
                     </td>
 
-                    <td className="px-4 py-2">
-                      <span className={`inline-flex items-center gap-2 border rounded px-2 py-1 text-xs ${cls}`}>
+                    <td className="px-3 py-1.5">
+                      <span className={`inline-flex items-center gap-1.5 border rounded px-1.5 py-0.5 text-[11px] ${cls}`}>
                         {st}
                         {waiting ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">waiting</span>
+                          <span className="text-[10px] px-1 py-0.5 rounded border bg-white">waiting</span>
                         ) : null}
                         {hot ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded border bg-white">hot</span>
+                          <span className="text-[10px] px-1 py-0.5 rounded border bg-white">hot</span>
                         ) : null}
                       </span>
                     </td>
 
-                    <td className="px-4 py-2">{renderSourceBadge(l.source)}</td>
+                    <td className="px-3 py-1.5">{renderSourceBadge(l.source)}</td>
 
-                    <td className="px-4 py-2 text-gray-700">{formatCreated(l.createdAt)}</td>
-                    <td className="px-4 py-2 text-gray-700">{formatAge(l.createdAt)}</td>
+                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{formatCreated(l.createdAt)}</td>
+                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{formatAge(l.createdAt)}</td>
 
-                    <td className="px-4 py-2 text-gray-700">
+                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
                       {l.lastMessageAt ? formatCreated(l.lastMessageAt) : "-"}
                     </td>
 
-                    <td className="px-4 py-2 text-right">{Number(l.inboundCount ?? 0)}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-3 py-1.5 text-right">{Number(l.inboundCount ?? 0)}</td>
+                    <td className="px-3 py-1.5 text-right">
                       <button
                         type="button"
                         onClick={() => handleDeleteLead(l.id)}
-                        className="text-xs px-2 py-1 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                        className="text-[11px] px-2 py-0.5 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
                       >
                         Delete
                       </button>
@@ -525,7 +526,7 @@ export default function LeadsPage() {
 
               {sortedLeads.length === 0 ? (
                 <tr className="border-t">
-                  <td className="px-4 py-6 text-sm text-gray-500" colSpan={8}>
+                  <td className="px-3 py-5 text-sm text-gray-500" colSpan={8}>
                     No leads yet.
                   </td>
                 </tr>
