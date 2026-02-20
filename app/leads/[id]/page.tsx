@@ -32,6 +32,18 @@ function formatTime(raw?: string | null) {
   return d.toLocaleString();
 }
 
+function addMinutesToLocalInput(localValue: string, minutes: number) {
+  const d = new Date(localValue);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setMinutes(d.getMinutes() + minutes);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${hh}:${mm}`;
+}
+
 const STATUSES: LeadStatus[] = ["new", "contacted", "booked", "sold", "dead"];
 
 const STATUS_STYLE: Record<LeadStatus, string> = {
@@ -75,6 +87,12 @@ export default function LeadThreadPage() {
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
+
+  const [bookingStart, setBookingStart] = React.useState("");
+  const [bookingEnd, setBookingEnd] = React.useState("");
+  const [bookingTitle, setBookingTitle] = React.useState("");
+  const [bookingDescription, setBookingDescription] = React.useState("");
+  const [bookingBusy, setBookingBusy] = React.useState(false);
 
   const bottomRef = React.useRef<HTMLDivElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -184,6 +202,56 @@ export default function LeadThreadPage() {
       alert("Send failed: " + msg);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleBookAppointment() {
+    if (!leadId) return;
+    if (!bookingStart) {
+      alert("Please pick a start date/time.");
+      return;
+    }
+
+    const resolvedEnd = bookingEnd || addMinutesToLocalInput(bookingStart, 30);
+    if (!resolvedEnd) {
+      alert("Please provide a valid end date/time.");
+      return;
+    }
+
+    const start = new Date(bookingStart);
+    const end = new Date(resolvedEnd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      alert("End time must be after start time.");
+      return;
+    }
+
+    try {
+      setBookingBusy(true);
+      const r = await apiFetch(`${API_BASE}/api/appointments/book`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: Number(leadId),
+          startDateTime: start.toISOString(),
+          endDateTime: end.toISOString(),
+          summary: bookingTitle.trim() || `Appointment - ${lead?.name || lead?.phone || "Lead"}`,
+          description: bookingDescription.trim(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York",
+        }),
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data?.ok) {
+        throw new Error(String(data?.error || "booking_failed"));
+      }
+
+      setBookingEnd(resolvedEnd);
+      alert("Appointment created. Lead status updated to booked.");
+      await loadThread();
+    } catch (e: any) {
+      alert(`Booking failed: ${String(e?.message || e)}`);
+    } finally {
+      setBookingBusy(false);
     }
   }
 
@@ -328,6 +396,60 @@ export default function LeadThreadPage() {
           placeholder="Add notes about this lead..."
           className="w-full border rounded p-2 text-sm h-24"
         />
+      </div>
+
+      <div className="mb-3 border rounded-lg p-3 bg-white shadow-sm">
+        <div className="text-sm font-medium mb-2">Book Appointment</div>
+        <div className="grid gap-2 md:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700">Start</span>
+            <input
+              type="datetime-local"
+              value={bookingStart}
+              onChange={(e) => setBookingStart(e.target.value)}
+              className="w-full border rounded px-2 py-2"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700">End</span>
+            <input
+              type="datetime-local"
+              value={bookingEnd}
+              onChange={(e) => setBookingEnd(e.target.value)}
+              className="w-full border rounded px-2 py-2"
+            />
+          </label>
+          <label className="text-sm md:col-span-2">
+            <span className="mb-1 block text-gray-700">Title</span>
+            <input
+              type="text"
+              value={bookingTitle}
+              onChange={(e) => setBookingTitle(e.target.value)}
+              placeholder={`Appointment - ${lead?.name || lead?.phone || "Lead"}`}
+              className="w-full border rounded px-2 py-2"
+            />
+          </label>
+          <label className="text-sm md:col-span-2">
+            <span className="mb-1 block text-gray-700">Description (optional)</span>
+            <textarea
+              value={bookingDescription}
+              onChange={(e) => setBookingDescription(e.target.value)}
+              className="w-full border rounded px-2 py-2 h-20"
+            />
+          </label>
+        </div>
+
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleBookAppointment}
+            disabled={bookingBusy}
+            className="bg-green-600 text-white px-3 py-2 rounded"
+          >
+            {bookingBusy ? "Booking..." : "Book + Mark Booked"}
+          </button>
+          <span className="text-xs text-gray-500">Creates Google event and auto-updates lead status.</span>
+        </div>
       </div>
 
       <div className="mb-3 flex gap-2">
