@@ -388,7 +388,14 @@ export default function LeadThreadPage() {
 
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <div className="text-xl font-semibold leading-tight">{lead?.name || lead?.phone || "Lead"}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xl font-semibold leading-tight">{lead?.name || lead?.phone || "Lead"}</div>
+            {archived ? (
+              <span className="text-xs px-2 py-0.5 rounded border bg-cyan-100 text-cyan-800 border-cyan-300">
+                Archived
+              </span>
+            ) : null}
+          </div>
           <div className="text-sm text-gray-500">{lead?.phone}</div>
         </div>
 
