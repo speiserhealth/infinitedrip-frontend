@@ -9,7 +9,6 @@ type SettingsResponse = {
     user_id?: string;
     textdrip_api_token_set?: boolean;
     textdrip_base_url?: string;
-    textdrip_inbound_number?: string;
     textdrip_webhook_secret_set?: boolean;
     google_calendar_id?: string;
     google_client_id?: string;
@@ -22,7 +21,6 @@ type SettingsResponse = {
 type FormState = {
   textdrip_api_token: string;
   textdrip_base_url: string;
-  textdrip_inbound_number: string;
   textdrip_webhook_secret: string;
   google_calendar_id: string;
   google_client_id: string;
@@ -33,7 +31,6 @@ type FormState = {
 const INITIAL_FORM: FormState = {
   textdrip_api_token: "",
   textdrip_base_url: "",
-  textdrip_inbound_number: "",
   textdrip_webhook_secret: "",
   google_calendar_id: "",
   google_client_id: "",
@@ -52,6 +49,7 @@ function formatUpdatedAt(value?: string | null) {
 export default function SettingsPage() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [connectingGoogle, setConnectingGoogle] = React.useState(false);
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState("");
 
@@ -62,6 +60,7 @@ export default function SettingsPage() {
   const [googleRefreshTokenSet, setGoogleRefreshTokenSet] = React.useState(false);
 
   const [form, setForm] = React.useState<FormState>(INITIAL_FORM);
+  const [googleStatus, setGoogleStatus] = React.useState("");
 
   async function loadSettings() {
     setLoading(true);
@@ -79,7 +78,6 @@ export default function SettingsPage() {
       setForm({
         textdrip_api_token: "",
         textdrip_base_url: String(s.textdrip_base_url || ""),
-        textdrip_inbound_number: String(s.textdrip_inbound_number || ""),
         textdrip_webhook_secret: "",
         google_calendar_id: String(s.google_calendar_id || ""),
         google_client_id: String(s.google_client_id || ""),
@@ -103,6 +101,12 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search || "");
+    setGoogleStatus(String(params.get("google") || "").trim());
+  }, []);
+
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -116,7 +120,6 @@ export default function SettingsPage() {
     try {
       const payload: Record<string, string> = {
         textdrip_base_url: form.textdrip_base_url,
-        textdrip_inbound_number: form.textdrip_inbound_number,
         google_calendar_id: form.google_calendar_id,
         google_client_id: form.google_client_id,
       };
@@ -146,6 +149,26 @@ export default function SettingsPage() {
     }
   }
 
+  async function onConnectGoogle() {
+    setError("");
+    setSuccess("");
+    setConnectingGoogle(true);
+    try {
+      const res = await apiFetch("/api/integrations/google/url", { cache: "no-store" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Google connect failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const data = await res.json();
+      const url = String(data?.url || "");
+      if (!url) throw new Error("Missing Google auth URL.");
+      window.location.href = url;
+    } catch (e: any) {
+      setError(String(e?.message || "Google connect failed"));
+      setConnectingGoogle(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl p-6">
       <h1 className="text-2xl font-semibold text-gray-900">User Settings</h1>
@@ -160,6 +183,21 @@ export default function SettingsPage() {
       {error ? <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
       {success ? (
         <div className="mt-4 rounded border border-green-300 bg-green-50 p-3 text-sm text-green-700">{success}</div>
+      ) : null}
+      {googleStatus === "connected" ? (
+        <div className="mt-4 rounded border border-green-300 bg-green-50 p-3 text-sm text-green-700">
+          Google Calendar connected successfully.
+        </div>
+      ) : null}
+      {googleStatus === "missing_refresh_token" ? (
+        <div className="mt-4 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+          Google returned no refresh token. Try Connect again and approve all prompts.
+        </div>
+      ) : null}
+      {googleStatus === "invalid_callback" || googleStatus === "error" ? (
+        <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          Google connection failed. Please try again.
+        </div>
       ) : null}
 
       {loading ? (
@@ -192,17 +230,6 @@ export default function SettingsPage() {
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Inbound Number</span>
-                <input
-                  type="text"
-                  value={form.textdrip_inbound_number}
-                  onChange={(e) => onField("textdrip_inbound_number", e.target.value)}
-                  placeholder="+19045551234"
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block text-sm">
                 <span className="mb-1 block text-gray-700">Webhook Secret</span>
                 <input
                   type="password"
@@ -217,6 +244,19 @@ export default function SettingsPage() {
 
           <section className="rounded border border-gray-200 bg-white p-4">
             <h2 className="text-lg font-medium text-gray-900">Google Calendar</h2>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={onConnectGoogle}
+                disabled={connectingGoogle}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {connectingGoogle ? "Redirecting..." : "Connect Google Calendar"}
+              </button>
+              <p className="mt-2 text-xs text-gray-500">
+                Recommended: use Connect so users do not need to manually manage OAuth tokens.
+              </p>
+            </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               <label className="block text-sm">
                 <span className="mb-1 block text-gray-700">Calendar ID</span>
