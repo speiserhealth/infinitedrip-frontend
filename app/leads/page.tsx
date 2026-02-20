@@ -24,6 +24,8 @@ type Lead = {
   inbound?: number | null;
   source?: string | null;
   hot?: number | null;
+  archived?: number | null;
+  archived_at?: string | null;
 };
 
 type LeadsResponse = {
@@ -122,10 +124,13 @@ function normalizeLead(raw: any): Lead {
     inboundCount: Number(inboundCount ?? 0),
     source: String(raw?.source || "manual"),
     hot: Number(raw?.hot ?? 0),
+    archived: Number(raw?.archived ?? 0),
+    archived_at: raw?.archived_at ?? null,
   };
 }
 
 type SortKey = "newest" | "oldest";
+type LeadView = "active" | "archived" | "all";
 
 async function readResponseError(r: Response): Promise<string> {
   const ct = (r.headers.get("content-type") || "").toLowerCase();
@@ -163,6 +168,7 @@ export default function LeadsPage() {
   const [error, setError] = React.useState("");
 
   const [sort, setSort] = React.useState<SortKey>("newest");
+  const [view, setView] = React.useState<LeadView>("active");
 
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
@@ -173,7 +179,9 @@ export default function LeadsPage() {
   const [importResult, setImportResult] = React.useState<string>("");
 
   async function loadLeads() {
-    const r = await apiFetch(`/api/leads`, { cache: "no-store" });
+    const includeArchived = view !== "active";
+    const suffix = includeArchived ? "?include_archived=1" : "";
+    const r = await apiFetch(`/api/leads${suffix}`, { cache: "no-store" });
     if (!r.ok) {
       const details = await readResponseError(r);
       const url = (r as any)?.url ? String((r as any).url) : "unknown-url";
@@ -185,7 +193,13 @@ export default function LeadsPage() {
     const list = listRaw.map((l: any) => normalizeLead(l));
     const c = Array.isArray(data) ? null : (data as LeadsResponse)?.counts ?? null;
 
-    setLeads(list);
+    const filtered = list.filter((l) => {
+      const a = Number((l as any).archived ?? 0) === 1;
+      if (view === "active") return !a;
+      if (view === "archived") return a;
+      return true;
+    });
+    setLeads(filtered);
     setCounts(c);
   }
 
@@ -228,7 +242,7 @@ export default function LeadsPage() {
       dead = true;
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [view]);
 
   async function handleAddLead(e: React.FormEvent) {
     e.preventDefault();
@@ -327,6 +341,24 @@ export default function LeadsPage() {
     }
   }
 
+  async function handleArchiveLead(leadId: number, archived: boolean) {
+    try {
+      setError("");
+      const r = await apiFetch(`/api/leads/${leadId}/archive`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      if (!r.ok) {
+        const details = await readResponseError(r);
+        throw new Error(`Archive update failed (${r.status}): ${details}`);
+      }
+      await loadLeads();
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : "Archive update failed");
+    }
+  }
+
   const sortedLeads = React.useMemo(() => {
     const copy = [...leads];
 
@@ -391,6 +423,16 @@ export default function LeadsPage() {
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
+          </select>
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as LeadView)}
+            className="border rounded px-2 py-1.5 text-xs"
+            title="Lead view"
+          >
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="all">All records</option>
           </select>
 
           <Link href="/pipeline" className="text-sm text-blue-600 underline">
@@ -514,13 +556,22 @@ export default function LeadsPage() {
 
                     <td className="px-3 py-1.5 text-right">{Number(l.inboundCount ?? 0)}</td>
                     <td className="px-3 py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteLead(l.id)}
-                        className="text-[11px] px-2 py-0.5 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                      >
-                        Delete
-                      </button>
+                      <div className="inline-flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveLead(l.id, Number(l.archived ?? 0) !== 1)}
+                          className="text-[11px] px-2 py-0.5 rounded border bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100"
+                        >
+                          {Number(l.archived ?? 0) === 1 ? "Unarchive" : "Archive"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLead(l.id)}
+                          className="text-[11px] px-2 py-0.5 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

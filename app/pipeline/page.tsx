@@ -23,6 +23,7 @@ type Lead = {
   inbound?: number | null;
   source?: string | null;
   hot?: number | null;
+  archived?: number | null;
 };
 
 const COLUMNS: LeadStatus[] = ["engaged", "cold", "booked", "sold", "dead"];
@@ -126,6 +127,7 @@ function normalizeLead(raw: any): Lead {
 }
 
 type SortKey = "newest" | "oldest";
+type RangeKey = "3" | "7" | "30" | "90" | "all";
 
 export default function PipelinePage() {
   const API_BASE =
@@ -136,6 +138,13 @@ export default function PipelinePage() {
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [sort, setSort] = React.useState<SortKey>("newest");
+  const [columnRange, setColumnRange] = React.useState<Record<LeadStatus, RangeKey>>({
+    engaged: "30",
+    cold: "30",
+    booked: "30",
+    sold: "30",
+    dead: "30",
+  });
 
   const dragLeadIdRef = React.useRef<number | null>(null);
   const [dragOver, setDragOver] = React.useState<LeadStatus | null>(null);
@@ -186,7 +195,17 @@ export default function PipelinePage() {
   }
 
   function leadsFor(status: LeadStatus) {
-    const list = leads.filter((l) => normalizeStatus(l.status) === status);
+    const range = columnRange[status] || "30";
+    const now = Date.now();
+    const maxAgeMs = range === "all" ? null : Number(range) * 24 * 60 * 60 * 1000;
+
+    const list = leads.filter((l) => {
+      if (normalizeStatus(l.status) !== status) return false;
+      if (maxAgeMs === null) return true;
+      const createdMs = toDateSafe(l.createdAt);
+      if (!createdMs) return false;
+      return (now - createdMs) <= maxAgeMs;
+    });
     list.sort((a, b) => {
       const ta = toDateSafe(a.createdAt);
       const tb = toDateSafe(b.createdAt);
@@ -228,6 +247,24 @@ export default function PipelinePage() {
       await loadLeads();
     } catch {
       setError("Hot toggle failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setArchived(leadId: number, archived: boolean) {
+    try {
+      setBusy(true);
+      setError("");
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/archive`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      if (!r.ok) throw new Error("Archive update failed");
+      await loadLeads();
+    } catch {
+      setError("Archive update failed");
     } finally {
       setBusy(false);
     }
@@ -311,7 +348,23 @@ export default function PipelinePage() {
             >
               <div className="mb-3 flex items-center justify-between">
                 <div className="font-medium">{STATUS_LABEL[col]}</div>
-                <div className="text-xs text-gray-500">{leadsFor(col).length}</div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={columnRange[col]}
+                    onChange={(e) =>
+                      setColumnRange((prev) => ({ ...prev, [col]: e.target.value as RangeKey }))
+                    }
+                    className="text-[11px] border rounded px-1.5 py-0.5 bg-white"
+                    title="Date range"
+                  >
+                    <option value="3">3d</option>
+                    <option value="7">7d</option>
+                    <option value="30">30d</option>
+                    <option value="90">90d</option>
+                    <option value="all">All</option>
+                  </select>
+                  <div className="text-xs text-gray-500">{leadsFor(col).length}</div>
+                </div>
               </div>
 
               <div className="flex-1 space-y-2 overflow-y-auto">
@@ -375,6 +428,18 @@ export default function PipelinePage() {
                               title={hot ? "Unset hot" : "Set hot"}
                             >
                               🔥
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setArchived(l.id, true).catch(() => {});
+                              }}
+                              className="text-[11px] px-2 py-1 rounded border bg-white border-gray-300 text-gray-600"
+                              title="Archive lead"
+                            >
+                              Archive
                             </button>
                           </div>
                         </div>
