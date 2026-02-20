@@ -3,20 +3,41 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import * as React from "react";
+import { apiFetch } from "@/lib/apiFetch";
 
-const navItems = [
+const baseNavItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/leads", label: "Leads" },
   { href: "/pipeline", label: "Funnel" },
   { href: "/stats", label: "Stats" },
   { href: "/settings", label: "Settings" },
-  { href: "/admin/users", label: "User Approvals" },
-  { href: "/admin/audit", label: "Audit Log" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/me", { cache: "no-store" });
+        if (!r.ok) return;
+        const body = await r.json().catch(() => ({}));
+        const role = String(body?.user?.role || "").toLowerCase();
+        if (!dead) setIsAdmin(role === "admin");
+      } catch {}
+    })();
+    return () => {
+      dead = true;
+    };
+  }, []);
+
+  const navItems = isAdmin
+    ? [...baseNavItems, { href: "/admin/users", label: "User Approvals" }, { href: "/admin/audit", label: "Audit Log" }]
+    : baseNavItems;
 
   const handleLogout = async () => {
     // This clears the NextAuth session cookie and then redirects.

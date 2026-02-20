@@ -43,12 +43,26 @@ export default function AdminUsersPage() {
   const [tab, setTab] = React.useState<Tab>("pending");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
   const [busyId, setBusyId] = React.useState<number | null>(null);
 
   async function load(nextTab: Tab = tab) {
     setLoading(true);
     setError("");
     try {
+      const meResp = await apiFetch("/api/me", { cache: "no-store" });
+      if (!meResp.ok) throw new Error("Not authenticated");
+      const meBody = await meResp.json().catch(() => ({}));
+      const role = String(meBody?.user?.role || "").toLowerCase();
+      const admin = role === "admin";
+      setIsAdmin(admin);
+      if (!admin) {
+        setUsers([]);
+        setStatus({});
+        setLoading(false);
+        return;
+      }
+
       const [usersResp, statusResp] = await Promise.all([
         apiFetch(`/api/admin/users?status=${nextTab}`, { cache: "no-store" }),
         apiFetch("/api/admin/system-status", { cache: "no-store" }),
@@ -103,6 +117,9 @@ export default function AdminUsersPage() {
   return (
     <div className="p-6 max-w-6xl">
       <h1 className="text-2xl font-semibold">User Management</h1>
+      {isAdmin === false ? (
+        <p className="mt-3 text-sm text-red-600">Admin access required.</p>
+      ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         <div className="rounded border border-gray-200 bg-white p-3 text-sm">

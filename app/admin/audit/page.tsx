@@ -24,11 +24,24 @@ export default function AdminAuditPage() {
   const [logs, setLogs] = React.useState<AuditRow[]>([]);
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
 
   async function load() {
     setLoading(true);
     setError("");
     try {
+      const meResp = await apiFetch("/api/me", { cache: "no-store" });
+      if (!meResp.ok) throw new Error("Not authenticated");
+      const meBody = await meResp.json().catch(() => ({}));
+      const role = String(meBody?.user?.role || "").toLowerCase();
+      const admin = role === "admin";
+      setIsAdmin(admin);
+      if (!admin) {
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
+
       const r = await apiFetch("/api/admin/audit-logs?limit=200", { cache: "no-store" });
       if (!r.ok) {
         const txt = await r.text().catch(() => "");
@@ -55,6 +68,9 @@ export default function AdminAuditPage() {
           Refresh
         </button>
       </div>
+      {isAdmin === false ? (
+        <p className="mt-3 text-sm text-red-600">Admin access required.</p>
+      ) : null}
 
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       {loading ? <p className="mt-3 text-sm text-gray-600">Loading...</p> : null}
