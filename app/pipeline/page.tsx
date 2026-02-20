@@ -12,10 +12,15 @@ type Lead = {
   phone?: string | null;
   status?: LeadStatus | string | null;
   createdAt?: string | null;
+  created_at?: string | null;
+  created?: string | null;
 
   lastMessageDirection?: "in" | "out" | null;
   lastMessageAt?: string | null;
+  last_message_at?: string | null;
   inboundCount?: number | null;
+  inbound_count?: number | null;
+  inbound?: number | null;
   source?: string | null;
 };
 
@@ -78,10 +83,10 @@ function formatAge(v?: string | null) {
 function renderSourceBadge(v?: string | null) {
   const s = String(v || "manual");
 
-  if (s === "inbound_webhook") {
+  if (s === "textdrip" || s === "inbound_webhook") {
     return (
       <span className="text-[10px] px-2 py-1 rounded border bg-blue-100 text-blue-800 border-blue-300">
-        Webhook
+        Textdrip
       </span>
     );
   }
@@ -107,6 +112,16 @@ function renderSourceBadge(v?: string | null) {
   );
 }
 
+function normalizeLead(raw: any): Lead {
+  return {
+    ...raw,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null,
+    lastMessageAt: raw?.lastMessageAt ?? raw?.last_message_at ?? null,
+    inboundCount: Number(raw?.inboundCount ?? raw?.inbound_count ?? raw?.inbound ?? 0),
+    source: String(raw?.source || "manual"),
+  };
+}
+
 type SortKey = "newest" | "oldest";
 
 export default function PipelinePage() {
@@ -126,7 +141,8 @@ export default function PipelinePage() {
     const r = await apiFetch(`${API_BASE}/api/leads`, { cache: "no-store" });
     if (!r.ok) throw new Error("Load failed");
     const data = await r.json();
-    const list: Lead[] = Array.isArray(data) ? data : data?.leads ?? [];
+    const listRaw: Lead[] = Array.isArray(data) ? data : data?.leads ?? [];
+    const list = listRaw.map((l: any) => normalizeLead(l));
     setLeads(list);
   }
 

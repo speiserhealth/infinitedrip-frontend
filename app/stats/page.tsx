@@ -9,12 +9,19 @@ type Lead = {
   status?: string | null;
   source?: string | null;
   createdAt?: string | null;
+  created_at?: string | null;
+  created?: string | null;
 
   firstInboundAt?: string | null;
   firstOutboundAt?: string | null;
 
   lastMessageDirection?: "in" | "out" | null;
   inboundCount?: number | null;
+  inbound_count?: number | null;
+  inbound?: number | null;
+  lastMessageAt?: string | null;
+  last_message_at?: string | null;
+  last_message?: string | null;
 };
 
 type LeadsResponse = {
@@ -45,10 +52,20 @@ function pct(n: number, d: number) {
 
 function srcLabel(src?: string | null) {
   const s = String(src || "manual");
-  if (s === "inbound_webhook") return "Webhook";
+  if (s === "inbound_webhook" || s === "textdrip") return "Textdrip";
   if (s === "csv_import") return "CSV";
   if (s === "manual") return "Manual";
   return s;
+}
+
+function normalizeLead(raw: any): Lead {
+  return {
+    ...raw,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null,
+    inboundCount: Number(raw?.inboundCount ?? raw?.inbound_count ?? raw?.inbound ?? 0),
+    lastMessageAt: raw?.lastMessageAt ?? raw?.last_message_at ?? null,
+    source: String(raw?.source || "manual"),
+  };
 }
 
 function median(values: number[]) {
@@ -77,7 +94,8 @@ export default function StatsPage() {
     const r = await apiFetch(`${API_BASE}/api/leads`, { cache: "no-store" });
     if (!r.ok) throw new Error("Failed");
     const data: any = await r.json();
-    const list: Lead[] = Array.isArray(data) ? data : (data as LeadsResponse)?.leads ?? [];
+    const listRaw: Lead[] = Array.isArray(data) ? data : (data as LeadsResponse)?.leads ?? [];
+    const list = listRaw.map((l: any) => normalizeLead(l));
     setLeads(list);
   }
 

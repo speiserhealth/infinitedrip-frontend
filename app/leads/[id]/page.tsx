@@ -139,8 +139,9 @@ export default function LeadThreadPage() {
 
       setNewMessage("");
       await loadThread();
-    } catch {
-      alert("Send failed");
+    } catch (e: any) {
+      const msg = e?.message || "unknown error";
+      alert("Send failed: " + msg);
     } finally {
       setSending(false);
     }

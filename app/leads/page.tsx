@@ -12,10 +12,16 @@ type Lead = {
   phone?: string | null;
   status?: LeadStatus | string | null;
   createdAt?: string | null;
+  created_at?: string | null;
+  created?: string | null;
 
   lastMessageDirection?: "in" | "out" | null;
   lastMessageAt?: string | null;
+  last_message_at?: string | null;
+  last_message?: string | null;
   inboundCount?: number | null;
+  inbound_count?: number | null;
+  inbound?: number | null;
   source?: string | null;
 };
 
@@ -73,10 +79,10 @@ function formatAge(v?: string | null) {
 function renderSourceBadge(v?: string | null) {
   const s = String(v || "manual");
 
-  if (s === "inbound_webhook") {
+  if (s === "textdrip" || s === "inbound_webhook") {
     return (
       <span className="text-[11px] px-2 py-1 rounded border bg-blue-100 text-blue-800 border-blue-300">
-        Webhook
+        Textdrip
       </span>
     );
   }
@@ -100,6 +106,20 @@ function renderSourceBadge(v?: string | null) {
       {s}
     </span>
   );
+}
+
+function normalizeLead(raw: any): Lead {
+  const createdAt = raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null;
+  const lastMessageAt = raw?.lastMessageAt ?? raw?.last_message_at ?? null;
+  const inboundCount = raw?.inboundCount ?? raw?.inbound_count ?? raw?.inbound ?? 0;
+
+  return {
+    ...raw,
+    createdAt,
+    lastMessageAt,
+    inboundCount: Number(inboundCount ?? 0),
+    source: String(raw?.source || "manual"),
+  };
 }
 
 type SortKey = "newest" | "oldest";
@@ -158,7 +178,8 @@ export default function LeadsPage() {
     }
 
     const data: any = await r.json();
-    const list: Lead[] = Array.isArray(data) ? data : (data as LeadsResponse)?.leads ?? [];
+    const listRaw: Lead[] = Array.isArray(data) ? data : (data as LeadsResponse)?.leads ?? [];
+    const list = listRaw.map((l: any) => normalizeLead(l));
     const c = Array.isArray(data) ? null : (data as LeadsResponse)?.counts ?? null;
 
     setLeads(list);
@@ -226,7 +247,7 @@ export default function LeadsPage() {
         setLeads((prev) => {
           const id = Number((created as any).id || 0);
           const filtered = id ? prev.filter((x: any) => Number((x as any).id || 0) !== id) : prev;
-          return [created as any, ...filtered];
+          return [normalizeLead(created), ...filtered.map((x: any) => normalizeLead(x))];
         });
       }
 
@@ -276,6 +297,23 @@ export default function LeadsPage() {
       setError(msg);
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function handleDeleteLead(leadId: number) {
+    const yes = window.confirm("Delete this lead and all its messages?");
+    if (!yes) return;
+    try {
+      setError("");
+      const r = await apiFetch(`/api/leads/${leadId}`, { method: "DELETE" });
+      if (!r.ok) {
+        const details = await readResponseError(r);
+        throw new Error(`Delete failed (${r.status}): ${details}`);
+      }
+      setLeads((prev) => prev.filter((l) => Number(l.id) !== Number(leadId)));
+      loadLeads().catch(() => {});
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : "Delete failed");
     }
   }
 
@@ -421,6 +459,7 @@ export default function LeadsPage() {
                 <th className="text-left px-4 py-2">Age</th>
                 <th className="text-left px-4 py-2">Last msg</th>
                 <th className="text-right px-4 py-2">Inbound</th>
+                <th className="text-right px-4 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -464,13 +503,22 @@ export default function LeadsPage() {
                     </td>
 
                     <td className="px-4 py-2 text-right">{Number(l.inboundCount ?? 0)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteLead(l.id)}
+                        className="text-xs px-2 py-1 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
 
               {sortedLeads.length === 0 ? (
                 <tr className="border-t">
-                  <td className="px-4 py-6 text-sm text-gray-500" colSpan={7}>
+                  <td className="px-4 py-6 text-sm text-gray-500" colSpan={8}>
                     No leads yet.
                   </td>
                 </tr>

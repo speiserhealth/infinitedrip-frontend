@@ -7,8 +7,9 @@ import { signOut } from "next-auth/react";
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/leads", label: "Leads" },
-    { href: "/pipeline", label: "Funnel" },
+  { href: "/pipeline", label: "Funnel" },
   { href: "/stats", label: "Stats" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default function Sidebar() {

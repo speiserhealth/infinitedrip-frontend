@@ -22,5 +22,6 @@ export const config = {
     "/leads/:path*",
     "/pipeline/:path*",
     "/stats/:path*",
+    "/settings/:path*",
   ],
 };
