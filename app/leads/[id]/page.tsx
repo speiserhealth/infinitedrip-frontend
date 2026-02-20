@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/apiFetch";
 
 type LeadStatus = "new" | "contacted" | "booked" | "sold" | "dead";
 
@@ -11,7 +12,7 @@ type Lead = {
   name?: string | null;
   phone?: string | null;
   status?: LeadStatus | string | null;
-  ai_enabled?: number | null; // 1 or 0
+  ai_enabled?: number | null;
   notes?: string | null;
 };
 
@@ -41,6 +42,8 @@ const STATUS_STYLE: Record<LeadStatus, string> = {
   dead: "bg-red-100 text-red-700 border-red-300",
 };
 
+const EMOJI_CHOICES = ["🙂", "👍", "✅", "📅", "⏰", "🙏", "🎉", "📲"];
+
 function normalizeStatus(s: any): LeadStatus {
   const v = String(s || "new").toLowerCase();
   if (v === "new" || v === "contacted" || v === "booked" || v === "sold" || v === "dead") return v;
@@ -62,6 +65,9 @@ export default function LeadThreadPage() {
 
   const [newMessage, setNewMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const [mediaUrl, setMediaUrl] = React.useState("");
+  const [showEmoji, setShowEmoji] = React.useState(false);
 
   const [q, setQ] = React.useState("");
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
@@ -71,6 +77,7 @@ export default function LeadThreadPage() {
   const [savingNotes, setSavingNotes] = React.useState(false);
 
   const bottomRef = React.useRef<HTMLDivElement | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   async function loadThread() {
     if (!leadId) return;
@@ -82,7 +89,6 @@ export default function LeadThreadPage() {
 
     setLead(found);
 
-    // keep notes draft in sync when lead changes (but don't overwrite while typing)
     if (found && typeof found.notes === "string") {
       setNotesDraft((prev) => (prev === "" ? found.notes || "" : prev));
     }
@@ -93,7 +99,6 @@ export default function LeadThreadPage() {
     setMessages(msgs);
   }
 
-  // Poll
   React.useEffect(() => {
     if (!leadId) return;
 
@@ -117,14 +122,48 @@ export default function LeadThreadPage() {
     };
   }, [leadId, API_BASE]);
 
-  // Auto-scroll when not searching
   React.useEffect(() => {
     if (q.trim()) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, q]);
 
+  function insertEmoji(value: string) {
+    setNewMessage((prev) => `${prev}${value}`);
+    setShowEmoji(false);
+  }
+
+  function openImagePicker() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const body = new FormData();
+      body.append("image", file);
+
+      const r = await apiFetch(`${API_BASE}/api/uploads/image`, {
+        method: "POST",
+        body,
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data?.url) {
+        throw new Error(String(data?.error || "upload_failed"));
+      }
+      setMediaUrl(String(data.url));
+    } catch (err: any) {
+      alert(`Image upload failed: ${String(err?.message || err)}`);
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   async function handleSend() {
-    if (!newMessage.trim() || !leadId) return;
+    if ((!newMessage.trim() && !mediaUrl) || !leadId) return;
 
     try {
       setSending(true);
@@ -132,12 +171,13 @@ export default function LeadThreadPage() {
       const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: newMessage }),
+        body: JSON.stringify({ text: newMessage, media_url: mediaUrl || undefined }),
       });
 
       if (!r.ok) throw new Error("Send failed");
 
       setNewMessage("");
+      setMediaUrl("");
       await loadThread();
     } catch (e: any) {
       const msg = e?.message || "unknown error";
@@ -270,7 +310,6 @@ export default function LeadThreadPage() {
         </div>
       </div>
 
-      {/* Notes */}
       <div className="mb-3 border rounded-lg p-3 bg-white shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-medium">Notes</div>
@@ -291,7 +330,6 @@ export default function LeadThreadPage() {
         />
       </div>
 
-      {/* Search */}
       <div className="mb-3 flex gap-2">
         <input
           value={q}
@@ -306,7 +344,6 @@ export default function LeadThreadPage() {
         ) : null}
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 mb-3 pr-1">
         {filtered.length === 0 ? (
           <div className="text-gray-500">{q.trim() ? "No matches." : "No messages yet."}</div>
@@ -328,23 +365,82 @@ export default function LeadThreadPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Composer */}
-      <div className="border-t pt-3 flex gap-2">
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 border rounded px-3 py-2"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
-          }}
-        />
-        <button onClick={handleSend} disabled={sending} className="bg-blue-600 text-white px-4 py-2 rounded">
-          {sending ? "..." : "Send"}
-        </button>
+      <div className="border-t pt-3">
+        {mediaUrl ? (
+          <div className="mb-2 rounded border border-gray-200 p-2 flex items-center justify-between gap-3">
+            <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline truncate">
+              Attached image
+            </a>
+            <button
+              type="button"
+              onClick={() => setMediaUrl("")}
+              className="text-xs border rounded px-2 py-1"
+            >
+              Remove
+            </button>
+          </div>
+        ) : null}
+
+        {showEmoji ? (
+          <div className="mb-2 rounded border border-gray-200 p-2 flex flex-wrap gap-2 bg-white">
+            {EMOJI_CHOICES.map((emo) => (
+              <button
+                key={emo}
+                type="button"
+                onClick={() => insertEmoji(emo)}
+                className="border rounded px-2 py-1 text-lg leading-none hover:bg-gray-50"
+              >
+                {emo}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder={mediaUrl ? "Optional caption..." : "Type a message..."}
+            className="flex-1 border rounded px-3 py-2"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSend();
+            }}
+          />
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={handleImageSelected}
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={openImagePicker}
+            disabled={uploadingImage || sending}
+            className="border px-3 py-2 rounded"
+            title="Upload image"
+          >
+            {uploadingImage ? "Uploading..." : "📷"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowEmoji((v) => !v)}
+            disabled={sending}
+            className="border px-3 py-2 rounded"
+            title="Emoji"
+          >
+            😊
+          </button>
+
+          <button onClick={handleSend} disabled={sending || (!newMessage.trim() && !mediaUrl)} className="bg-blue-600 text-white px-4 py-2 rounded">
+            {sending ? "..." : "Send"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-import { apiFetch } from "@/lib/apiFetch";
