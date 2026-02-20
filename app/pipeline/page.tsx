@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 
-type LeadStatus = "new" | "contacted" | "booked" | "sold" | "dead";
+type LeadStatus = "engaged" | "cold" | "booked" | "sold" | "dead";
 
 type Lead = {
   id: number;
@@ -22,30 +22,32 @@ type Lead = {
   inbound_count?: number | null;
   inbound?: number | null;
   source?: string | null;
+  hot?: number | null;
 };
 
-const COLUMNS: LeadStatus[] = ["new", "contacted", "booked", "sold", "dead"];
+const COLUMNS: LeadStatus[] = ["engaged", "cold", "booked", "sold", "dead"];
 
 const STATUS_LABEL: Record<LeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
+  engaged: "Engaged",
+  cold: "Cold",
   booked: "Booked",
   sold: "Sold",
   dead: "Dead",
 };
 
 const COL_STYLE: Record<LeadStatus, string> = {
-  new: "bg-gray-50 border-gray-300",
-  contacted: "bg-yellow-50 border-yellow-300",
+  engaged: "bg-yellow-50 border-yellow-300",
+  cold: "bg-cyan-50 border-cyan-300",
   booked: "bg-green-50 border-green-300",
   sold: "bg-indigo-50 border-indigo-300",
   dead: "bg-red-50 border-red-300",
 };
 
 function normalizeStatus(s: any): LeadStatus {
-  const v = String(s || "new").toLowerCase();
-  if (v === "new" || v === "contacted" || v === "booked" || v === "sold" || v === "dead") return v;
-  return "new";
+  const v = String(s || "engaged").toLowerCase();
+  if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
+  if (v === "booked" || v === "sold" || v === "cold" || v === "dead") return v;
+  return "engaged";
 }
 
 function toDateSafe(v?: string | null): number {
@@ -119,6 +121,7 @@ function normalizeLead(raw: any): Lead {
     lastMessageAt: raw?.lastMessageAt ?? raw?.last_message_at ?? null,
     inboundCount: Number(raw?.inboundCount ?? raw?.inbound_count ?? raw?.inbound ?? 0),
     source: String(raw?.source || "manual"),
+    hot: Number(raw?.hot ?? 0),
   };
 }
 
@@ -175,18 +178,11 @@ export default function PipelinePage() {
   }, [API_BASE]);
 
   function isCold(l: Lead) {
-    const st = normalizeStatus(l.status);
-    const createdMs = toDateSafe(l.createdAt);
-    const ageMs = createdMs ? Date.now() - createdMs : 0;
-
-    return (
-      (st === "new" && ageMs >= 24 * 60 * 60 * 1000) ||
-      (st === "contacted" && ageMs >= 3 * 24 * 60 * 60 * 1000)
-    );
+    return normalizeStatus(l.status) === "cold";
   }
 
   function isHot(l: Lead) {
-    return Number(l.inboundCount ?? 0) >= 3;
+    return Number(l.hot ?? 0) === 1 || normalizeStatus(l.status) === "engaged";
   }
 
   function leadsFor(status: LeadStatus) {
@@ -214,6 +210,24 @@ export default function PipelinePage() {
       await loadLeads();
     } catch {
       setError("Move failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleHot(leadId: number, hot: boolean) {
+    try {
+      setBusy(true);
+      setError("");
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/hot`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hot }),
+      });
+      if (!r.ok) throw new Error("Hot toggle failed");
+      await loadLeads();
+    } catch {
+      setError("Hot toggle failed");
     } finally {
       setBusy(false);
     }
@@ -346,6 +360,22 @@ export default function PipelinePage() {
                             ) : null}
 
                             {renderSourceBadge(l.source)}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleHot(l.id, !hot).catch(() => {});
+                              }}
+                              className={`text-[11px] px-2 py-1 rounded border ${
+                                hot
+                                  ? "bg-orange-100 border-orange-300 text-orange-800"
+                                  : "bg-white border-gray-300 text-gray-600"
+                              }`}
+                              title={hot ? "Unset hot" : "Set hot"}
+                            >
+                              🔥
+                            </button>
                           </div>
                         </div>
 

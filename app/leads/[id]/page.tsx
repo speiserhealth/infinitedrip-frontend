@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
-type LeadStatus = "new" | "contacted" | "booked" | "sold" | "dead";
+type LeadStatus = "engaged" | "cold" | "booked" | "sold" | "dead";
 
 type Lead = {
   id: number;
@@ -14,6 +14,7 @@ type Lead = {
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
   notes?: string | null;
+  hot?: number | null;
 };
 
 type Msg = {
@@ -44,11 +45,11 @@ function addMinutesToLocalInput(localValue: string, minutes: number) {
   return `${y}-${m}-${day}T${hh}:${mm}`;
 }
 
-const STATUSES: LeadStatus[] = ["new", "contacted", "booked", "sold", "dead"];
+const STATUSES: LeadStatus[] = ["engaged", "cold", "booked", "sold", "dead"];
 
 const STATUS_STYLE: Record<LeadStatus, string> = {
-  new: "bg-gray-100 text-gray-700 border-gray-300",
-  contacted: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  engaged: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  cold: "bg-cyan-100 text-cyan-800 border-cyan-300",
   booked: "bg-green-100 text-green-800 border-green-300",
   sold: "bg-indigo-100 text-indigo-800 border-indigo-300",
   dead: "bg-red-100 text-red-700 border-red-300",
@@ -57,9 +58,10 @@ const STATUS_STYLE: Record<LeadStatus, string> = {
 const EMOJI_CHOICES = ["🙂", "👍", "✅", "📅", "⏰", "🙏", "🎉", "📲"];
 
 function normalizeStatus(s: any): LeadStatus {
-  const v = String(s || "new").toLowerCase();
-  if (v === "new" || v === "contacted" || v === "booked" || v === "sold" || v === "dead") return v;
-  return "new";
+  const v = String(s || "engaged").toLowerCase();
+  if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
+  if (v === "cold" || v === "booked" || v === "sold" || v === "dead") return v;
+  return "engaged";
 }
 
 export default function LeadThreadPage() {
@@ -84,6 +86,7 @@ export default function LeadThreadPage() {
   const [q, setQ] = React.useState("");
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
   const [updatingAi, setUpdatingAi] = React.useState(false);
+  const [updatingHot, setUpdatingHot] = React.useState(false);
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -299,6 +302,24 @@ export default function LeadThreadPage() {
     }
   }
 
+  async function handleHotToggle(nextHot: boolean) {
+    if (!leadId) return;
+    try {
+      setUpdatingHot(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/hot`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hot: nextHot }),
+      });
+      if (!r.ok) throw new Error("Hot toggle failed");
+      await loadThread();
+    } catch {
+      alert("Hot toggle failed");
+    } finally {
+      setUpdatingHot(false);
+    }
+  }
+
   async function saveNotes() {
     if (!leadId) return;
 
@@ -330,6 +351,7 @@ export default function LeadThreadPage() {
   const currentStatus = normalizeStatus(lead?.status);
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
+  const hot = Number(lead?.hot ?? 0) === 1 || currentStatus === "engaged";
 
   return (
     <div className="p-4 md:p-6 max-w-[1280px] mx-auto h-[85vh] flex flex-col">
@@ -375,6 +397,17 @@ export default function LeadThreadPage() {
             />
             <span className="text-gray-700">AI {aiOn ? "On" : "Off"}</span>
           </label>
+          <button
+            type="button"
+            onClick={() => handleHotToggle(!hot)}
+            disabled={updatingHot}
+            className={`rounded border px-2 py-1 text-sm ${
+              hot ? "bg-orange-100 border-orange-300 text-orange-800" : "bg-white border-gray-300 text-gray-600"
+            }`}
+            title={hot ? "Unset hot" : "Set hot"}
+          >
+            🔥 {hot ? "Hot" : "Not hot"}
+          </button>
         </div>
       </div>
 

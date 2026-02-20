@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 
-type LeadStatus = "new" | "contacted" | "booked" | "sold" | "dead";
+type LeadStatus = "engaged" | "booked" | "sold" | "cold" | "dead";
 
 type Lead = {
   id: number;
@@ -23,6 +23,7 @@ type Lead = {
   inbound_count?: number | null;
   inbound?: number | null;
   source?: string | null;
+  hot?: number | null;
 };
 
 type LeadsResponse = {
@@ -31,17 +32,18 @@ type LeadsResponse = {
 };
 
 const STATUS_STYLE: Record<LeadStatus, string> = {
-  new: "bg-gray-100 text-gray-700 border-gray-300",
-  contacted: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  engaged: "bg-yellow-100 text-yellow-800 border-yellow-300",
   booked: "bg-green-100 text-green-800 border-green-300",
   sold: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  cold: "bg-cyan-100 text-cyan-800 border-cyan-300",
   dead: "bg-red-100 text-red-700 border-red-300",
 };
 
 function normalizeStatus(s: any): LeadStatus {
-  const v = String(s || "new").toLowerCase();
-  if (v === "new" || v === "contacted" || v === "booked" || v === "sold" || v === "dead") return v;
-  return "new";
+  const v = String(s || "engaged").toLowerCase();
+  if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
+  if (v === "booked" || v === "sold" || v === "cold" || v === "dead") return v;
+  return "engaged";
 }
 
 function toDateSafe(v?: string | null): number {
@@ -119,6 +121,7 @@ function normalizeLead(raw: any): Lead {
     lastMessageAt,
     inboundCount: Number(inboundCount ?? 0),
     source: String(raw?.source || "manual"),
+    hot: Number(raw?.hot ?? 0),
   };
 }
 
@@ -329,7 +332,7 @@ export default function LeadsPage() {
 
     const isWaiting = (l: Lead) => l.lastMessageDirection === "in";
     const inbound = (l: Lead) => Number(l.inboundCount ?? 0);
-    const isHot = (l: Lead) => inbound(l) >= 3;
+    const isHot = (l: Lead) => Number(l.hot ?? 0) === 1 || normalizeStatus(l.status) === "engaged";
 
     const isCold = (l: Lead) => {
       const status = normalizeStatus(l.status);
@@ -337,8 +340,7 @@ export default function LeadsPage() {
       const ageMs = createdMs ? Date.now() - createdMs : 0;
 
       return (
-        (status === "new" && ageMs >= 24 * 60 * 60 * 1000) ||
-        (status === "contacted" && ageMs >= 3 * 24 * 60 * 60 * 1000)
+        (status === "engaged" && ageMs >= 3 * 24 * 60 * 60 * 1000)
       );
     };
 
