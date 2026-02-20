@@ -5,10 +5,12 @@ import { apiFetch } from "@/lib/apiFetch";
 
 type SettingsResponse = {
   ok?: boolean;
+  webhook_url?: string;
   settings?: {
     user_id?: string;
     textdrip_api_token_set?: boolean;
     textdrip_base_url?: string;
+    textdrip_webhook_secret?: string;
     textdrip_webhook_secret_set?: boolean;
     google_calendar_id?: string;
     google_client_id?: string;
@@ -50,6 +52,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [connectingGoogle, setConnectingGoogle] = React.useState(false);
+  const [rotatingSecret, setRotatingSecret] = React.useState(false);
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState("");
 
@@ -58,6 +61,7 @@ export default function SettingsPage() {
   const [webhookSecretSet, setWebhookSecretSet] = React.useState(false);
   const [googleClientSecretSet, setGoogleClientSecretSet] = React.useState(false);
   const [googleRefreshTokenSet, setGoogleRefreshTokenSet] = React.useState(false);
+  const [webhookUrl, setWebhookUrl] = React.useState("");
 
   const [form, setForm] = React.useState<FormState>(INITIAL_FORM);
   const [googleStatus, setGoogleStatus] = React.useState("");
@@ -74,11 +78,12 @@ export default function SettingsPage() {
 
       const data = (await res.json()) as SettingsResponse;
       const s = data?.settings || {};
+      setWebhookUrl(String(data?.webhook_url || ""));
 
       setForm({
         textdrip_api_token: "",
         textdrip_base_url: String(s.textdrip_base_url || ""),
-        textdrip_webhook_secret: "",
+        textdrip_webhook_secret: String(s.textdrip_webhook_secret || ""),
         google_calendar_id: String(s.google_calendar_id || ""),
         google_client_id: String(s.google_client_id || ""),
         google_client_secret: "",
@@ -169,6 +174,39 @@ export default function SettingsPage() {
     }
   }
 
+  async function onRotateWebhookSecret() {
+    setRotatingSecret(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch("/api/settings/webhook-secret/rotate", { method: "POST" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Rotate failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const data = (await res.json()) as SettingsResponse;
+      const s = data?.settings || {};
+      setWebhookUrl(String(data?.webhook_url || ""));
+      setForm((prev) => ({ ...prev, textdrip_webhook_secret: String(s.textdrip_webhook_secret || "") }));
+      setWebhookSecretSet(!!s.textdrip_webhook_secret_set);
+      setSuccess("Webhook secret rotated.");
+    } catch (e: any) {
+      setError(String(e?.message || "Rotate failed"));
+    } finally {
+      setRotatingSecret(false);
+    }
+  }
+
+  async function onCopyWebhookUrl() {
+    if (!webhookUrl) return;
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setSuccess("Webhook URL copied.");
+    } catch {
+      setError("Could not copy webhook URL.");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl p-6">
       <h1 className="text-2xl font-semibold text-gray-900">User Settings</h1>
@@ -239,6 +277,35 @@ export default function SettingsPage() {
                   className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 />
               </label>
+              <div className="block text-sm md:col-span-2">
+                <span className="mb-1 block text-gray-700">Inbound Webhook URL</span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={webhookUrl}
+                    readOnly
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm bg-gray-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={onCopyWebhookUrl}
+                    className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRotateWebhookSecret}
+                    disabled={rotatingSecret}
+                    className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {rotatingSecret ? "Rotating..." : "Rotate"}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Use this URL in Textdrip inbound webhook settings for this account.
+                </p>
+              </div>
             </div>
           </section>
 

@@ -78,6 +78,20 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function resendApprovalEmail(id: number) {
+    setBusyId(id);
+    setError("");
+    try {
+      const r = await apiFetch(`/api/admin/users/${id}/resend-approval-email`, { method: "POST" });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        throw new Error(`resend failed (${r.status}): ${txt}`);
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="p-6 max-w-5xl">
       <h1 className="text-2xl font-semibold">Pending User Approvals</h1>
@@ -140,6 +154,13 @@ export default function AdminUsersPage() {
                     className="rounded bg-red-600 text-white text-sm px-3 py-2 hover:bg-red-500 disabled:opacity-60"
                   >
                     Delete
+                  </button>
+                  <button
+                    onClick={() => resendApprovalEmail(u.id).catch((e) => setError(String(e?.message || "Resend failed")))}
+                    disabled={busy}
+                    className="rounded bg-gray-700 text-white text-sm px-3 py-2 hover:bg-gray-600 disabled:opacity-60"
+                  >
+                    Resend Email
                   </button>
                 </div>
               </div>
