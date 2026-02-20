@@ -332,7 +332,7 @@ export default function LeadThreadPage() {
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto flex flex-col h-[85vh]">
+    <div className="p-4 md:p-6 max-w-[1280px] mx-auto h-[85vh] flex flex-col">
       <div className="mb-3 flex items-center gap-3">
         <Link href="/leads" className="text-blue-600 underline">
           ← Back
@@ -345,7 +345,7 @@ export default function LeadThreadPage() {
 
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <div className="text-xl font-semibold">{lead?.name || lead?.phone || "Lead"}</div>
+          <div className="text-xl font-semibold leading-tight">{lead?.name || lead?.phone || "Lead"}</div>
           <div className="text-sm text-gray-500">{lead?.phone}</div>
         </div>
 
@@ -356,7 +356,7 @@ export default function LeadThreadPage() {
               value={currentStatus}
               onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
               disabled={updatingStatus}
-              className={`border rounded px-2 py-2 text-sm ${statusStyle}`}
+              className={`border rounded px-2 py-1.5 text-sm ${statusStyle}`}
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -378,190 +378,195 @@ export default function LeadThreadPage() {
         </div>
       </div>
 
-      <div className="mb-3 border rounded-lg p-3 bg-white shadow-sm">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-medium">Notes</div>
-          <button
-            onClick={saveNotes}
-            disabled={savingNotes}
-            className="border rounded px-3 py-1 text-sm"
-          >
-            {savingNotes ? "Saving..." : "Save"}
-          </button>
-        </div>
-
-        <textarea
-          value={notesDraft}
-          onChange={(e) => setNotesDraft(e.target.value)}
-          placeholder="Add notes about this lead..."
-          className="w-full border rounded p-2 text-sm h-24"
-        />
-      </div>
-
-      <div className="mb-3 border rounded-lg p-3 bg-white shadow-sm">
-        <div className="text-sm font-medium mb-2">Book Appointment</div>
-        <div className="grid gap-2 md:grid-cols-2">
-          <label className="text-sm">
-            <span className="mb-1 block text-gray-700">Start</span>
-            <input
-              type="datetime-local"
-              value={bookingStart}
-              onChange={(e) => setBookingStart(e.target.value)}
-              className="w-full border rounded px-2 py-2"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block text-gray-700">End</span>
-            <input
-              type="datetime-local"
-              value={bookingEnd}
-              onChange={(e) => setBookingEnd(e.target.value)}
-              className="w-full border rounded px-2 py-2"
-            />
-          </label>
-          <label className="text-sm md:col-span-2">
-            <span className="mb-1 block text-gray-700">Title</span>
-            <input
-              type="text"
-              value={bookingTitle}
-              onChange={(e) => setBookingTitle(e.target.value)}
-              placeholder={`Appointment - ${lead?.name || lead?.phone || "Lead"}`}
-              className="w-full border rounded px-2 py-2"
-            />
-          </label>
-          <label className="text-sm md:col-span-2">
-            <span className="mb-1 block text-gray-700">Description (optional)</span>
-            <textarea
-              value={bookingDescription}
-              onChange={(e) => setBookingDescription(e.target.value)}
-              className="w-full border rounded px-2 py-2 h-20"
-            />
-          </label>
-        </div>
-
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleBookAppointment}
-            disabled={bookingBusy}
-            className="bg-green-600 text-white px-3 py-2 rounded"
-          >
-            {bookingBusy ? "Booking..." : "Book + Mark Booked"}
-          </button>
-          <span className="text-xs text-gray-500">Creates Google event and auto-updates lead status.</span>
-        </div>
-      </div>
-
-      <div className="mb-3 flex gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search this conversation…"
-          className="flex-1 border rounded px-3 py-2"
-        />
-        {q ? (
-          <button onClick={() => setQ("")} className="border rounded px-3 py-2">
-            Clear
-          </button>
-        ) : null}
-      </div>
-
-      <div className="flex-1 overflow-y-auto space-y-3 mb-3 pr-1">
-        {filtered.length === 0 ? (
-          <div className="text-gray-500">{q.trim() ? "No matches." : "No messages yet."}</div>
-        ) : (
-          filtered.map((m) => (
-            <div
-              key={m.id}
-              className={`border rounded-lg p-3 shadow-sm ${m.direction === "out" ? "bg-blue-50 ml-8" : "bg-white mr-8"}`}
-            >
-              <div className="flex justify-between mb-1 text-xs">
-                <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
-                <div className="text-gray-500">{formatTime(m.created_at)}</div>
-              </div>
-              <div className="whitespace-pre-wrap text-sm">{m.text}</div>
-            </div>
-          ))
-        )}
-
-        <div ref={bottomRef} />
-      </div>
-
-      <div className="border-t pt-3">
-        {mediaUrl ? (
-          <div className="mb-2 rounded border border-gray-200 p-2 flex items-center justify-between gap-3">
-            <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline truncate">
-              Attached image
-            </a>
-            <button
-              type="button"
-              onClick={() => setMediaUrl("")}
-              className="text-xs border rounded px-2 py-1"
-            >
-              Remove
-            </button>
-          </div>
-        ) : null}
-
-        {showEmoji ? (
-          <div className="mb-2 rounded border border-gray-200 p-2 flex flex-wrap gap-2 bg-white">
-            {EMOJI_CHOICES.map((emo) => (
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-3">
+        <aside className="order-2 lg:order-2 min-h-0 overflow-y-auto pr-1 space-y-3">
+          <div className="border rounded-lg p-3 bg-white shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">Notes</div>
               <button
-                key={emo}
-                type="button"
-                onClick={() => insertEmoji(emo)}
-                className="border rounded px-2 py-1 text-lg leading-none hover:bg-gray-50"
+                onClick={saveNotes}
+                disabled={savingNotes}
+                className="border rounded px-3 py-1 text-sm"
               >
-                {emo}
+                {savingNotes ? "Saving..." : "Save"}
               </button>
-            ))}
+            </div>
+
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              placeholder="Add notes about this lead..."
+              className="w-full border rounded p-2 text-sm h-28"
+            />
           </div>
-        ) : null}
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={mediaUrl ? "Optional caption..." : "Type a message..."}
-            className="flex-1 border rounded px-3 py-2"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSend();
-            }}
-          />
+          <div className="border rounded-lg p-3 bg-white shadow-sm">
+            <div className="text-sm font-medium mb-2">Book Appointment</div>
+            <div className="grid gap-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">Start</span>
+                <input
+                  type="datetime-local"
+                  value={bookingStart}
+                  onChange={(e) => setBookingStart(e.target.value)}
+                  className="w-full border rounded px-2 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">End</span>
+                <input
+                  type="datetime-local"
+                  value={bookingEnd}
+                  onChange={(e) => setBookingEnd(e.target.value)}
+                  className="w-full border rounded px-2 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">Title</span>
+                <input
+                  type="text"
+                  value={bookingTitle}
+                  onChange={(e) => setBookingTitle(e.target.value)}
+                  placeholder={`Appointment - ${lead?.name || lead?.phone || "Lead"}`}
+                  className="w-full border rounded px-2 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">Description (optional)</span>
+                <textarea
+                  value={bookingDescription}
+                  onChange={(e) => setBookingDescription(e.target.value)}
+                  className="w-full border rounded px-2 py-2 h-20"
+                />
+              </label>
+            </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            onChange={handleImageSelected}
-            className="hidden"
-          />
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleBookAppointment}
+                disabled={bookingBusy}
+                className="bg-green-600 text-white px-3 py-2 rounded"
+              >
+                {bookingBusy ? "Booking..." : "Book + Mark Booked"}
+              </button>
+            </div>
+          </div>
+        </aside>
 
-          <button
-            type="button"
-            onClick={openImagePicker}
-            disabled={uploadingImage || sending}
-            className="border px-3 py-2 rounded"
-            title="Upload image"
-          >
-            {uploadingImage ? "Uploading..." : "📷"}
-          </button>
+        <section className="order-1 lg:order-1 min-h-0 flex flex-col">
+          <div className="mb-2 flex gap-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search this conversation…"
+              className="flex-1 border rounded px-3 py-2"
+            />
+            {q ? (
+              <button onClick={() => setQ("")} className="border rounded px-3 py-2">
+                Clear
+              </button>
+            ) : null}
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setShowEmoji((v) => !v)}
-            disabled={sending}
-            className="border px-3 py-2 rounded"
-            title="Emoji"
-          >
-            😊
-          </button>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3 pr-1">
+            {filtered.length === 0 ? (
+              <div className="text-gray-500">{q.trim() ? "No matches." : "No messages yet."}</div>
+            ) : (
+              filtered.map((m) => (
+                <div
+                  key={m.id}
+                  className={`border rounded-lg p-3 shadow-sm ${m.direction === "out" ? "bg-blue-50 ml-8" : "bg-white mr-8"}`}
+                >
+                  <div className="flex justify-between mb-1 text-xs">
+                    <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
+                    <div className="text-gray-500">{formatTime(m.created_at)}</div>
+                  </div>
+                  <div className="whitespace-pre-wrap text-sm">{m.text}</div>
+                </div>
+              ))
+            )}
 
-          <button onClick={handleSend} disabled={sending || (!newMessage.trim() && !mediaUrl)} className="bg-blue-600 text-white px-4 py-2 rounded">
-            {sending ? "..." : "Send"}
-          </button>
-        </div>
+            <div ref={bottomRef} />
+          </div>
+
+          <div className="border-t pt-3">
+            {mediaUrl ? (
+              <div className="mb-2 rounded border border-gray-200 p-2 flex items-center justify-between gap-3">
+                <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline truncate">
+                  Attached image
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setMediaUrl("")}
+                  className="text-xs border rounded px-2 py-1"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : null}
+
+            {showEmoji ? (
+              <div className="mb-2 rounded border border-gray-200 p-2 flex flex-wrap gap-2 bg-white">
+                {EMOJI_CHOICES.map((emo) => (
+                  <button
+                    key={emo}
+                    type="button"
+                    onClick={() => insertEmoji(emo)}
+                    className="border rounded px-2 py-1 text-lg leading-none hover:bg-gray-50"
+                  >
+                    {emo}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder={mediaUrl ? "Optional caption..." : "Type a message..."}
+                className="flex-1 border rounded px-3 py-2"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSend();
+                }}
+              />
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={handleImageSelected}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={openImagePicker}
+                disabled={uploadingImage || sending}
+                className="border px-3 py-2 rounded"
+                title="Upload image"
+              >
+                {uploadingImage ? "Uploading..." : "📷"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowEmoji((v) => !v)}
+                disabled={sending}
+                className="border px-3 py-2 rounded"
+                title="Emoji"
+              >
+                😊
+              </button>
+
+              <button onClick={handleSend} disabled={sending || (!newMessage.trim() && !mediaUrl)} className="bg-blue-600 text-white px-4 py-2 rounded">
+                {sending ? "..." : "Send"}
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
