@@ -26,6 +26,16 @@ type AdminStatus = {
   };
 };
 
+type InviteRow = {
+  id: number;
+  email?: string;
+  role?: string;
+  created_by?: string;
+  created_at?: string;
+  expires_at?: string;
+  used_at?: string | null;
+};
+
 type Tab = "pending" | "approved" | "rejected";
 
 const TABS: Tab[] = ["pending", "approved", "rejected"];
@@ -45,6 +55,10 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = React.useState(true);
   const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
   const [busyId, setBusyId] = React.useState<number | null>(null);
+  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviteExpiryDays, setInviteExpiryDays] = React.useState("7");
+  const [invites, setInvites] = React.useState<InviteRow[]>([]);
+  const [inviteUrl, setInviteUrl] = React.useState("");
 
   async function load(nextTab: Tab = tab) {
     setLoading(true);
@@ -63,9 +77,10 @@ export default function AdminUsersPage() {
         return;
       }
 
-      const [usersResp, statusResp] = await Promise.all([
+      const [usersResp, statusResp, invitesResp] = await Promise.all([
         apiFetch(`/api/admin/users?status=${nextTab}`, { cache: "no-store" }),
         apiFetch("/api/admin/system-status", { cache: "no-store" }),
+        apiFetch("/api/admin/invites?limit=20", { cache: "no-store" }),
       ]);
 
       if (!usersResp.ok) {
@@ -76,12 +91,18 @@ export default function AdminUsersPage() {
         const txt = await statusResp.text().catch(() => "");
         throw new Error(`Load status failed (${statusResp.status}): ${txt}`);
       }
+      if (!invitesResp.ok) {
+        const txt = await invitesResp.text().catch(() => "");
+        throw new Error(`Load invites failed (${invitesResp.status}): ${txt}`);
+      }
 
       const usersBody = await usersResp.json();
       const statusBody = await statusResp.json();
+      const invitesBody = await invitesResp.json();
 
       setUsers(Array.isArray(usersBody?.users) ? usersBody.users : []);
       setStatus((statusBody?.status || {}) as AdminStatus);
+      setInvites(Array.isArray(invitesBody?.invites) ? invitesBody.invites : []);
     } catch (e: any) {
       setError(String(e?.message || "Failed to load"));
     } finally {
@@ -114,6 +135,26 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function createInvite() {
+    setError("");
+    setInviteUrl("");
+    const days = Number(inviteExpiryDays || "7");
+    const expiresMinutes = Math.max(1, days) * 24 * 60;
+    const r = await apiFetch("/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: inviteEmail, role: "agent", expiresMinutes }),
+    });
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      throw new Error(`Create invite failed (${r.status}): ${txt}`);
+    }
+    const body = await r.json().catch(() => ({}));
+    setInviteUrl(String(body?.signup_url || ""));
+    setInviteEmail("");
+    await load(tab);
+  }
+
   return (
     <div className="p-6 max-w-6xl">
       <h1 className="text-2xl font-semibold">User Management</h1>
@@ -141,6 +182,45 @@ export default function AdminUsersPage() {
           </div>
           <div className="text-xs text-gray-500">{status.email_from || "Set EMAIL_FROM + RESEND_API_KEY"}</div>
         </div>
+      </div>
+
+      <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+        <h2 className="text-lg font-medium">Create Invite</h2>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="Optional invite email"
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+          <input
+            type="number"
+            min={1}
+            value={inviteExpiryDays}
+            onChange={(e) => setInviteExpiryDays(e.target.value)}
+            placeholder="Expiry days"
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+          <button
+            onClick={() => createInvite().catch((e) => setError(String(e?.message || "Create invite failed")))}
+            className="rounded bg-blue-600 text-white text-sm px-3 py-2 hover:bg-blue-500"
+          >
+            Create Invite
+          </button>
+          <button
+            onClick={() => {
+              if (!inviteUrl) return;
+              navigator.clipboard.writeText(inviteUrl).catch(() => {});
+            }}
+            className="rounded border border-gray-300 text-sm px-3 py-2 hover:bg-gray-50"
+          >
+            Copy Invite URL
+          </button>
+        </div>
+        {inviteUrl ? (
+          <div className="mt-2 text-xs text-gray-600 break-all">{inviteUrl}</div>
+        ) : null}
       </div>
 
       <div className="mt-4 flex gap-2">
@@ -230,6 +310,20 @@ export default function AdminUsersPage() {
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {!loading && invites.length > 0 ? (
+        <div className="mt-6 rounded border border-gray-200 bg-white p-4">
+          <h2 className="text-lg font-medium">Recent Invites</h2>
+          <div className="mt-2 space-y-2">
+            {invites.map((inv) => (
+              <div key={inv.id} className="text-xs text-gray-700 border border-gray-100 rounded p-2">
+                <div>ID {inv.id} | role {inv.role || "agent"} | email {inv.email || "(any)"}</div>
+                <div>Created: {fmtDate(inv.created_at)} | Expires: {fmtDate(inv.expires_at)} | Used: {inv.used_at ? fmtDate(inv.used_at) : "no"}</div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

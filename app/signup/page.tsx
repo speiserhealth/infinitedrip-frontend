@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +18,17 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [website, setWebsite] = useState("");
+  const [inviteToken, setInviteToken] = useState("");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search || "");
+    setInviteToken(String(params.get("invite") || "").trim());
+  }, []);
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +51,7 @@ export default function SignupPage() {
           phone,
           email,
           password,
+          inviteToken,
           website,
           agreementAccepted,
         }),
@@ -53,6 +61,8 @@ export default function SignupPage() {
       if (!resp.ok) {
         const code = String(body?.error || "");
         if (code === "email_exists") setError("An account with that email already exists.");
+        else if (code === "invite_required") setError("A valid invite is required to sign up.");
+        else if (code === "invite_email_mismatch") setError("This invite is for a different email address.");
         else if (code === "agreement_required") setError("You must accept the User Agreement.");
         else if (code === "weak_password") setError("Password must be at least 8 characters.");
         else setError("Signup failed. Please check your details.");
@@ -87,6 +97,7 @@ export default function SignupPage() {
             </div>
             <Input placeholder="Personal phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            {inviteToken ? <p className="text-xs text-gray-600">Invite code detected.</p> : null}
             <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
             <Input
               type="password"
