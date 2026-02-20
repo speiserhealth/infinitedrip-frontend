@@ -23,5 +23,6 @@ export const config = {
     "/pipeline/:path*",
     "/stats/:path*",
     "/settings/:path*",
+    "/admin/:path*",
   ],
 };

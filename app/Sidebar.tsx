@@ -10,6 +10,7 @@ const navItems = [
   { href: "/pipeline", label: "Funnel" },
   { href: "/stats", label: "Stats" },
   { href: "/settings", label: "Settings" },
+  { href: "/admin/users", label: "User Approvals" },
 ];
 
 export default function Sidebar() {
