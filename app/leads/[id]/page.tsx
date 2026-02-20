@@ -15,6 +15,7 @@ type Lead = {
   ai_enabled?: number | null;
   notes?: string | null;
   hot?: number | null;
+  archived?: number | null;
 };
 
 type Msg = {
@@ -87,6 +88,7 @@ export default function LeadThreadPage() {
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
   const [updatingAi, setUpdatingAi] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
+  const [updatingArchive, setUpdatingArchive] = React.useState(false);
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -103,7 +105,7 @@ export default function LeadThreadPage() {
   async function loadThread() {
     if (!leadId) return;
 
-    const lr = await apiFetch(`${API_BASE}/api/leads`, { cache: "no-store" });
+    const lr = await apiFetch(`${API_BASE}/api/leads?include_archived=1`, { cache: "no-store" });
     const ldata = await lr.json();
     const list: Lead[] = Array.isArray(ldata) ? ldata : ldata?.leads ?? [];
     const found = list.find((x) => String(x.id) === String(leadId)) || null;
@@ -320,6 +322,24 @@ export default function LeadThreadPage() {
     }
   }
 
+  async function handleArchiveToggle(nextArchived: boolean) {
+    if (!leadId) return;
+    try {
+      setUpdatingArchive(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/archive`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: nextArchived }),
+      });
+      if (!r.ok) throw new Error("Archive toggle failed");
+      await loadThread();
+    } catch {
+      alert("Archive toggle failed");
+    } finally {
+      setUpdatingArchive(false);
+    }
+  }
+
   async function saveNotes() {
     if (!leadId) return;
 
@@ -352,6 +372,7 @@ export default function LeadThreadPage() {
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
   const hot = Number(lead?.hot ?? 0) === 1 || currentStatus === "engaged";
+  const archived = Number(lead?.archived ?? 0) === 1;
 
   return (
     <div className="p-4 md:p-6 max-w-[1280px] mx-auto h-[85vh] flex flex-col">
@@ -407,6 +428,17 @@ export default function LeadThreadPage() {
             title={hot ? "Unset hot" : "Set hot"}
           >
             🔥 {hot ? "Hot" : "Not hot"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleArchiveToggle(!archived)}
+            disabled={updatingArchive}
+            className={`rounded border px-2 py-1 text-sm ${
+              archived ? "bg-cyan-100 border-cyan-300 text-cyan-800" : "bg-white border-gray-300 text-gray-600"
+            }`}
+            title={archived ? "Unarchive lead" : "Archive lead"}
+          >
+            {archived ? "Unarchive" : "Archive"}
           </button>
         </div>
       </div>
