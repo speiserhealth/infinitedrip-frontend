@@ -12,6 +12,10 @@ type SettingsResponse = {
     textdrip_base_url?: string;
     textdrip_webhook_secret?: string;
     textdrip_webhook_secret_set?: boolean;
+    ai_quiet_hours_enabled?: boolean;
+    ai_quiet_hours_start?: string;
+    ai_quiet_hours_end?: string;
+    ai_max_replies_per_5m?: number;
     google_calendar_id?: string;
     google_client_id?: string;
     google_client_secret_set?: boolean;
@@ -24,6 +28,10 @@ type FormState = {
   textdrip_api_token: string;
   textdrip_base_url: string;
   textdrip_webhook_secret: string;
+  ai_quiet_hours_enabled: boolean;
+  ai_quiet_hours_start: string;
+  ai_quiet_hours_end: string;
+  ai_max_replies_per_5m: string;
   google_calendar_id: string;
   google_client_id: string;
   google_client_secret: string;
@@ -34,6 +42,10 @@ const INITIAL_FORM: FormState = {
   textdrip_api_token: "",
   textdrip_base_url: "",
   textdrip_webhook_secret: "",
+  ai_quiet_hours_enabled: false,
+  ai_quiet_hours_start: "22:00",
+  ai_quiet_hours_end: "08:00",
+  ai_max_replies_per_5m: "20",
   google_calendar_id: "",
   google_client_id: "",
   google_client_secret: "",
@@ -46,6 +58,12 @@ function formatUpdatedAt(value?: string | null) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleString();
+}
+
+function clampMaxReplies(value: string) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 20;
+  return Math.max(1, Math.min(100, Math.floor(n)));
 }
 
 export default function SettingsPage() {
@@ -84,6 +102,10 @@ export default function SettingsPage() {
         textdrip_api_token: "",
         textdrip_base_url: String(s.textdrip_base_url || ""),
         textdrip_webhook_secret: String(s.textdrip_webhook_secret || ""),
+        ai_quiet_hours_enabled: !!s.ai_quiet_hours_enabled,
+        ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
+        ai_quiet_hours_end: String(s.ai_quiet_hours_end || "08:00"),
+        ai_max_replies_per_5m: String(clampMaxReplies(String(s.ai_max_replies_per_5m ?? "20"))),
         google_calendar_id: String(s.google_calendar_id || ""),
         google_client_id: String(s.google_client_id || ""),
         google_client_secret: "",
@@ -116,6 +138,10 @@ export default function SettingsPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function applyMaxRepliesPreset(nextValue: number) {
+    onField("ai_max_replies_per_5m", String(clampMaxReplies(String(nextValue))));
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -123,8 +149,12 @@ export default function SettingsPage() {
     setSuccess("");
 
     try {
-      const payload: Record<string, string> = {
+      const payload: Record<string, unknown> = {
         textdrip_base_url: form.textdrip_base_url,
+        ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
+        ai_quiet_hours_start: form.ai_quiet_hours_start,
+        ai_quiet_hours_end: form.ai_quiet_hours_end,
+        ai_max_replies_per_5m: clampMaxReplies(form.ai_max_replies_per_5m),
         google_calendar_id: form.google_calendar_id,
         google_client_id: form.google_client_id,
       };
@@ -277,6 +307,82 @@ export default function SettingsPage() {
                   className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 />
               </label>
+
+              <div className="block text-sm">
+                <span className="mb-1 block text-gray-700">Max AI Replies (per 5 min)</span>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={form.ai_max_replies_per_5m}
+                    onChange={(e) => onField("ai_max_replies_per_5m", e.target.value)}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyMaxRepliesPreset(10)}
+                    className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50"
+                  >
+                    10
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMaxRepliesPreset(20)}
+                    className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50"
+                  >
+                    20
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMaxRepliesPreset(40)}
+                    className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50"
+                  >
+                    40
+                  </button>
+                </div>
+              </div>
+
+              <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="mb-1 block text-gray-800 font-medium">Quiet Hours</span>
+                    <p className="text-xs text-gray-500">AI will not auto-reply during this window.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onField("ai_quiet_hours_enabled", !form.ai_quiet_hours_enabled)}
+                    className={`rounded px-3 py-2 text-sm ${
+                      form.ai_quiet_hours_enabled
+                        ? "bg-gray-900 text-white hover:bg-gray-800"
+                        : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {form.ai_quiet_hours_enabled ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-gray-700">Start</span>
+                    <input
+                      type="time"
+                      value={form.ai_quiet_hours_start}
+                      onChange={(e) => onField("ai_quiet_hours_start", e.target.value)}
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-gray-700">End</span>
+                    <input
+                      type="time"
+                      value={form.ai_quiet_hours_end}
+                      onChange={(e) => onField("ai_quiet_hours_end", e.target.value)}
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-gray-700">Inbound Webhook URL</span>
                 <div className="flex gap-2">
@@ -284,7 +390,7 @@ export default function SettingsPage() {
                     type="text"
                     value={webhookUrl}
                     readOnly
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm bg-gray-50"
+                    className="w-full rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
                   />
                   <button
                     type="button"
