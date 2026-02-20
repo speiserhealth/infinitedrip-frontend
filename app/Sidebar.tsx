@@ -11,6 +11,7 @@ const navItems = [
   { href: "/stats", label: "Stats" },
   { href: "/settings", label: "Settings" },
   { href: "/admin/users", label: "User Approvals" },
+  { href: "/admin/audit", label: "Audit Log" },
 ];
 
 export default function Sidebar() {
