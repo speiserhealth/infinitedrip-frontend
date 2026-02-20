@@ -101,19 +101,26 @@ export default function StatsPage() {
 
   React.useEffect(() => {
     let dead = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     async function tick() {
+      let ok = false;
       try {
         await load();
+        ok = true;
         if (!dead) setError("");
       } catch {
         if (!dead) setError("Load failed");
+      } finally {
+        if (!dead) {
+          const delayMs = ok ? 7000 : 20000;
+          timer = setTimeout(tick, delayMs);
+        }
       }
     }
     tick();
-    const t = setInterval(tick, 3000);
     return () => {
       dead = true;
-      clearInterval(t);
+      if (timer) clearTimeout(timer);
     };
   }, [API_BASE]);
 

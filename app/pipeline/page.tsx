@@ -148,22 +148,29 @@ export default function PipelinePage() {
 
   React.useEffect(() => {
     let dead = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function tick() {
+      let ok = false;
       try {
         await loadLeads();
+        ok = true;
         if (!dead) setError("");
       } catch {
         if (!dead) setError("Load failed");
+      } finally {
+        if (!dead) {
+          const delayMs = ok ? 5000 : 15000;
+          timer = setTimeout(tick, delayMs);
+        }
       }
     }
 
     tick();
-    const t = setInterval(tick, 2000);
 
     return () => {
       dead = true;
-      clearInterval(t);
+      if (timer) clearTimeout(timer);
     };
   }, [API_BASE]);
 

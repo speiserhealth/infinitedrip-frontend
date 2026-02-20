@@ -188,10 +188,13 @@ export default function LeadsPage() {
 
   React.useEffect(() => {
     let dead = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function tick() {
+      let ok = false;
       try {
         await loadLeads();
+        ok = true;
         if (!dead) {
           setError((prev) => {
             const p = String(prev || "");
@@ -208,15 +211,19 @@ export default function LeadsPage() {
       } catch (e: any) {
         const msg = e?.message ? String(e.message) : "Load failed";
         if (!dead) setError(msg);
+      } finally {
+        if (!dead) {
+          const delayMs = ok ? 5000 : 15000;
+          timer = setTimeout(tick, delayMs);
+        }
       }
     }
 
     tick();
-    const t = setInterval(tick, 2000);
 
     return () => {
       dead = true;
-      clearInterval(t);
+      if (timer) clearTimeout(timer);
     };
   }, []);
 
