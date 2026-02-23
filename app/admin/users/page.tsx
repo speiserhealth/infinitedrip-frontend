@@ -42,6 +42,22 @@ type InviteRow = {
   used_at?: string | null;
 };
 
+type LeadIntegrityResult = {
+  scanned?: number;
+  affected?: number;
+  affected_rows?: number;
+  fixed_rows?: number;
+  apply_fixes?: boolean;
+  issue_counts?: Record<string, number>;
+  samples?: Array<{
+    id: number;
+    user_id: string;
+    issues?: string[];
+    before?: Record<string, any>;
+    after?: Record<string, any>;
+  }>;
+};
+
 type Tab = "pending" | "approved" | "rejected";
 
 const TABS: Tab[] = ["pending", "approved", "rejected"];
@@ -72,6 +88,10 @@ export default function AdminUsersPage() {
   const [inviteExpiryDays, setInviteExpiryDays] = React.useState("7");
   const [invites, setInvites] = React.useState<InviteRow[]>([]);
   const [inviteUrl, setInviteUrl] = React.useState("");
+  const [integrityUserId, setIntegrityUserId] = React.useState("");
+  const [integrityLimit, setIntegrityLimit] = React.useState("5000");
+  const [integrityBusy, setIntegrityBusy] = React.useState(false);
+  const [integrityResult, setIntegrityResult] = React.useState<LeadIntegrityResult | null>(null);
 
   async function load(nextTab: Tab = tab) {
     setLoading(true);
@@ -168,6 +188,35 @@ export default function AdminUsersPage() {
     await load(tab);
   }
 
+  async function runLeadIntegrity(applyFixes: boolean) {
+    setError("");
+    setIntegrityBusy(true);
+    try {
+      const params = new URLSearchParams();
+      const userId = String(integrityUserId || "").trim();
+      const limitNum = Math.max(1, Math.min(50000, Number(integrityLimit || "5000")));
+      params.set("limit", String(limitNum));
+      params.set("sample", "25");
+      params.set("apply", applyFixes ? "1" : "0");
+      if (userId) params.set("user_id", userId);
+
+      const r = await apiFetch(`/api/admin/data-integrity/leads?${params.toString()}`, {
+        cache: "no-store",
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        throw new Error(`Lead integrity check failed (${r.status}): ${txt}`);
+      }
+      const body = await r.json().catch(() => ({}));
+      setIntegrityResult((body?.result || null) as LeadIntegrityResult | null);
+      if (applyFixes) await load(tab);
+    } catch (e: any) {
+      setError(String(e?.message || "Lead integrity check failed"));
+    } finally {
+      setIntegrityBusy(false);
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl">
       <h1 className="text-2xl font-semibold">User Management</h1>
@@ -207,6 +256,61 @@ export default function AdminUsersPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+        <h2 className="text-lg font-medium">Lead Integrity</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Scans lead status/source/hot/archive consistency. Optional fix mode applies canonical values.
+        </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          <input
+            value={integrityUserId}
+            onChange={(e) => setIntegrityUserId(e.target.value)}
+            placeholder="Optional user_id scope"
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+          <input
+            type="number"
+            min={1}
+            max={50000}
+            value={integrityLimit}
+            onChange={(e) => setIntegrityLimit(e.target.value)}
+            placeholder="Scan row limit"
+            className="rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+          <button
+            disabled={integrityBusy}
+            onClick={() => runLeadIntegrity(false)}
+            className="rounded bg-gray-900 text-white text-sm px-3 py-2 hover:bg-gray-800 disabled:opacity-60"
+          >
+            {integrityBusy ? "Running..." : "Scan"}
+          </button>
+          <button
+            disabled={integrityBusy}
+            onClick={() => runLeadIntegrity(true)}
+            className="rounded bg-orange-600 text-white text-sm px-3 py-2 hover:bg-orange-500 disabled:opacity-60"
+          >
+            {integrityBusy ? "Working..." : "Scan + Fix"}
+          </button>
+        </div>
+
+        {integrityResult ? (
+          <div className="mt-3 rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
+            <div>
+              Scanned: {Number(integrityResult.scanned || 0)} | Affected rows:{" "}
+              {Number(integrityResult.affected_rows || 0)} | Fixed rows:{" "}
+              {Number(integrityResult.fixed_rows || 0)}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {Object.entries(integrityResult.issue_counts || {}).map(([k, v]) => (
+                <span key={k} className="rounded border border-gray-200 bg-white px-2 py-1">
+                  {k}: {v}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 rounded border border-gray-200 bg-white p-4">
