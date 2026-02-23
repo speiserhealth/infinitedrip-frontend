@@ -36,7 +36,12 @@ export default function Sidebar() {
   }, []);
 
   const navItems = isAdmin
-    ? [...baseNavItems, { href: "/admin/users", label: "User Approvals" }, { href: "/admin/audit", label: "Audit Log" }]
+    ? [
+        ...baseNavItems,
+        { href: "/admin/users", label: "User Approvals" },
+        { href: "/admin/audit", label: "Audit Log" },
+        { href: "/admin/textdrip", label: "Textdrip Debug" },
+      ]
     : baseNavItems;
 
   const handleLogout = async () => {
