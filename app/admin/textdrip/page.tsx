@@ -28,6 +28,24 @@ type SuppressedContact = {
   updated_at?: string | null;
 };
 
+type SummaryPayload = {
+  window_hours?: number;
+  filters?: { user_id?: string; phone?: string };
+  delivery_events?: {
+    total?: number;
+    delivered?: number;
+    failed?: number;
+    opt_out?: number;
+    opt_in?: number;
+    unique_phones?: number;
+    latest_event_at?: string | null;
+    by_status?: Record<string, number>;
+  };
+  suppressed_contacts?: {
+    active?: number;
+  };
+};
+
 function fmtDate(v?: string | null) {
   if (!v) return "";
   const d = new Date(v.includes("T") ? v : `${v.replace(" ", "T")}Z`);
@@ -35,14 +53,31 @@ function fmtDate(v?: string | null) {
   return d.toLocaleString();
 }
 
+function asPosInt(raw: string, fallback: number, min: number, max: number) {
+  const n = Number(raw || "");
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
 export default function AdminTextdripPage() {
   const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+
+  const [summary, setSummary] = React.useState<SummaryPayload | null>(null);
   const [events, setEvents] = React.useState<DeliveryEvent[]>([]);
   const [contacts, setContacts] = React.useState<SuppressedContact[]>([]);
+
   const [limitInput, setLimitInput] = React.useState("200");
+  const [hoursInput, setHoursInput] = React.useState("24");
+  const [userFilter, setUserFilter] = React.useState("");
+  const [phoneFilter, setPhoneFilter] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("");
+  const [eventTypeFilter, setEventTypeFilter] = React.useState("");
+  const [sourceFilter, setSourceFilter] = React.useState("");
   const [activeOnly, setActiveOnly] = React.useState(true);
+  const [includePayload, setIncludePayload] = React.useState(false);
+
   const [busyId, setBusyId] = React.useState<number | null>(null);
 
   async function load() {
@@ -55,23 +90,44 @@ export default function AdminTextdripPage() {
       const admin = String(meBody?.user?.role || "").toLowerCase() === "admin";
       setIsAdmin(admin);
       if (!admin) {
+        setSummary(null);
         setEvents([]);
         setContacts([]);
         setLoading(false);
         return;
       }
 
-      const limit = Math.max(1, Math.min(1000, Number(limitInput || "200")));
-      const activeOnlyParam = activeOnly ? "1" : "0";
+      const limit = asPosInt(limitInput, 200, 1, 1000);
+      const hours = asPosInt(hoursInput, 24, 1, 24 * 30);
 
-      const [eventsResp, contactsResp] = await Promise.all([
-        apiFetch(`/api/admin/textdrip/delivery-events?limit=${limit}`, { cache: "no-store" }),
-        apiFetch(
-          `/api/admin/textdrip/suppressed-contacts?limit=${limit}&active_only=${activeOnlyParam}`,
-          { cache: "no-store" }
-        ),
+      const summaryParams = new URLSearchParams();
+      summaryParams.set("hours", String(hours));
+      if (userFilter.trim()) summaryParams.set("user_id", userFilter.trim());
+      if (phoneFilter.trim()) summaryParams.set("phone", phoneFilter.trim());
+
+      const eventsParams = new URLSearchParams(summaryParams);
+      eventsParams.set("limit", String(limit));
+      eventsParams.set("include_payload", includePayload ? "1" : "0");
+      if (statusFilter.trim()) eventsParams.set("status", statusFilter.trim());
+      if (eventTypeFilter.trim()) eventsParams.set("event_type", eventTypeFilter.trim());
+
+      const contactsParams = new URLSearchParams();
+      contactsParams.set("limit", String(limit));
+      contactsParams.set("active_only", activeOnly ? "1" : "0");
+      if (userFilter.trim()) contactsParams.set("user_id", userFilter.trim());
+      if (phoneFilter.trim()) contactsParams.set("phone", phoneFilter.trim());
+      if (sourceFilter.trim()) contactsParams.set("source", sourceFilter.trim());
+
+      const [summaryResp, eventsResp, contactsResp] = await Promise.all([
+        apiFetch(`/api/admin/textdrip/summary?${summaryParams.toString()}`, { cache: "no-store" }),
+        apiFetch(`/api/admin/textdrip/delivery-events?${eventsParams.toString()}`, { cache: "no-store" }),
+        apiFetch(`/api/admin/textdrip/suppressed-contacts?${contactsParams.toString()}`, { cache: "no-store" }),
       ]);
 
+      if (!summaryResp.ok) {
+        const txt = await summaryResp.text().catch(() => "");
+        throw new Error(`Load summary failed (${summaryResp.status}): ${txt}`);
+      }
       if (!eventsResp.ok) {
         const txt = await eventsResp.text().catch(() => "");
         throw new Error(`Load delivery events failed (${eventsResp.status}): ${txt}`);
@@ -81,8 +137,11 @@ export default function AdminTextdripPage() {
         throw new Error(`Load suppressed contacts failed (${contactsResp.status}): ${txt}`);
       }
 
+      const summaryBody = await summaryResp.json().catch(() => ({}));
       const eventsBody = await eventsResp.json().catch(() => ({}));
       const contactsBody = await contactsResp.json().catch(() => ({}));
+
+      setSummary((summaryBody?.summary || null) as SummaryPayload | null);
       setEvents(Array.isArray(eventsBody?.events) ? eventsBody.events : []);
       setContacts(Array.isArray(contactsBody?.contacts) ? contactsBody.contacts : []);
     } catch (e: any) {
@@ -95,7 +154,7 @@ export default function AdminTextdripPage() {
   React.useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOnly]);
+  }, []);
 
   async function setContactActive(contact: SuppressedContact, nextActive: boolean) {
     setBusyId(contact.id);
@@ -118,34 +177,88 @@ export default function AdminTextdripPage() {
     }
   }
 
+  const statusBreakdown = summary?.delivery_events?.by_status || {};
+
   return (
-    <div className="p-6 max-w-[1400px]">
-      <div className="flex items-center justify-between gap-3">
+    <div className="p-6 max-w-[1600px]">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Textdrip Debug</h1>
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => load()}
+          className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="mt-3 rounded border border-gray-200 bg-white p-3">
+        <div className="grid gap-2 md:grid-cols-4">
           <input
             type="number"
             min={1}
             max={1000}
             value={limitInput}
             onChange={(e) => setLimitInput(e.target.value)}
-            className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
-            title="Limit"
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Limit"
           />
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={activeOnly}
-              onChange={(e) => setActiveOnly(e.target.checked)}
-            />
-            Active only
-          </label>
-          <button
-            onClick={() => load()}
-            className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-          >
-            Refresh
-          </button>
+          <input
+            type="number"
+            min={1}
+            max={24 * 30}
+            value={hoursInput}
+            onChange={(e) => setHoursInput(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Window hours"
+          />
+          <input
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Filter user_id"
+          />
+          <input
+            value={phoneFilter}
+            onChange={(e) => setPhoneFilter(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Filter phone (+1...)"
+          />
+          <input
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Delivery status (optional)"
+          />
+          <input
+            value={eventTypeFilter}
+            onChange={(e) => setEventTypeFilter(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Event type (optional)"
+          />
+          <input
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            placeholder="Suppression source (optional)"
+          />
+          <div className="flex items-center gap-4 px-1 text-sm text-gray-700">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={activeOnly}
+                onChange={(e) => setActiveOnly(e.target.checked)}
+              />
+              Active only
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={includePayload}
+                onChange={(e) => setIncludePayload(e.target.checked)}
+              />
+              Include payload
+            </label>
+          </div>
         </div>
       </div>
 
@@ -153,10 +266,63 @@ export default function AdminTextdripPage() {
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       {loading ? <p className="mt-3 text-sm text-gray-600">Loading...</p> : null}
 
+      <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Window</div>
+          <div className="text-lg font-semibold">{summary?.window_hours || 0}h</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Events</div>
+          <div className="text-lg font-semibold">{Number(summary?.delivery_events?.total || 0)}</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Delivered</div>
+          <div className="text-lg font-semibold text-green-700">{Number(summary?.delivery_events?.delivered || 0)}</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Failed</div>
+          <div className="text-lg font-semibold text-red-700">{Number(summary?.delivery_events?.failed || 0)}</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Opt-out</div>
+          <div className="text-lg font-semibold">{Number(summary?.delivery_events?.opt_out || 0)}</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Opt-in</div>
+          <div className="text-lg font-semibold">{Number(summary?.delivery_events?.opt_in || 0)}</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Unique phones</div>
+          <div className="text-lg font-semibold">{Number(summary?.delivery_events?.unique_phones || 0)}</div>
+        </div>
+        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
+          <div className="text-gray-500">Active suppressed</div>
+          <div className="text-lg font-semibold">{Number(summary?.suppressed_contacts?.active || 0)}</div>
+        </div>
+      </div>
+
+      {Object.keys(statusBreakdown).length > 0 ? (
+        <div className="mt-3 rounded border border-gray-200 bg-white p-3">
+          <div className="text-xs font-medium text-gray-600">Status breakdown</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.entries(statusBreakdown).map(([k, v]) => (
+              <span key={k} className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
+                {k}: {v}
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Latest event: {fmtDate(summary?.delivery_events?.latest_event_at || "") || "-"}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-6 rounded border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3">
-          <h2 className="text-lg font-medium">Recent Delivery Events</h2>
-          <p className="text-xs text-gray-500">Most recent Textdrip delivery status callbacks.</p>
+        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-medium">Recent Delivery Events</h2>
+            <p className="text-xs text-gray-500">{events.length} rows</p>
+          </div>
         </div>
         {!loading && events.length === 0 ? (
           <p className="px-4 py-3 text-sm text-gray-600">No delivery events found.</p>
@@ -174,7 +340,7 @@ export default function AdminTextdripPage() {
                   <th className="px-3 py-2 text-left">To</th>
                   <th className="px-3 py-2 text-left">Lead/Msg</th>
                   <th className="px-3 py-2 text-left">Provider Msg ID</th>
-                  <th className="px-3 py-2 text-left">Payload</th>
+                  {includePayload ? <th className="px-3 py-2 text-left">Payload</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -190,14 +356,16 @@ export default function AdminTextdripPage() {
                       {row.lead_id || "-"}/{row.message_id || "-"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.provider_message_id || "-"}</td>
-                    <td className="px-3 py-2">
-                      <details>
-                        <summary className="cursor-pointer text-xs text-blue-700">View</summary>
-                        <pre className="mt-1 whitespace-pre-wrap text-xs">
-                          {JSON.stringify(row.payload || {}, null, 2)}
-                        </pre>
-                      </details>
-                    </td>
+                    {includePayload ? (
+                      <td className="px-3 py-2">
+                        <details>
+                          <summary className="cursor-pointer text-xs text-blue-700">View</summary>
+                          <pre className="mt-1 whitespace-pre-wrap text-xs">
+                            {JSON.stringify(row.payload || {}, null, 2)}
+                          </pre>
+                        </details>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -209,7 +377,7 @@ export default function AdminTextdripPage() {
       <div className="mt-6 rounded border border-gray-200 bg-white">
         <div className="border-b border-gray-200 px-4 py-3">
           <h2 className="text-lg font-medium">Suppressed Contacts</h2>
-          <p className="text-xs text-gray-500">Use Unsuppress to allow sends again for a contact.</p>
+          <p className="text-xs text-gray-500">{contacts.length} rows</p>
         </div>
         {!loading && contacts.length === 0 ? (
           <p className="px-4 py-3 text-sm text-gray-600">No suppressed contacts found.</p>
