@@ -24,6 +24,16 @@ type Msg = {
   direction: "in" | "out";
   text: string;
   created_at?: string | null;
+  delivery_status?: string | null;
+  delivery_status_at?: string | null;
+};
+
+type TextdripTemplate = {
+  template_id: string;
+  name?: string | null;
+  body?: string | null;
+  category?: string | null;
+  is_active?: number | null;
 };
 
 function formatTime(raw?: string | null) {
@@ -83,6 +93,9 @@ export default function LeadThreadPage() {
   const [uploadingImage, setUploadingImage] = React.useState(false);
   const [mediaUrl, setMediaUrl] = React.useState("");
   const [showEmoji, setShowEmoji] = React.useState(false);
+  const [templates, setTemplates] = React.useState<TextdripTemplate[]>([]);
+  const [templateChoice, setTemplateChoice] = React.useState("");
+  const [syncingTemplates, setSyncingTemplates] = React.useState(false);
 
   const [q, setQ] = React.useState("");
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
@@ -101,6 +114,14 @@ export default function LeadThreadPage() {
 
   const bottomRef = React.useRef<HTMLDivElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  async function loadTemplates() {
+    const r = await apiFetch(`${API_BASE}/api/textdrip/templates`, { cache: "no-store" });
+    if (!r.ok) return;
+    const data = await r.json().catch(() => ({}));
+    const list = Array.isArray(data?.templates) ? data.templates : [];
+    setTemplates(list);
+  }
 
   async function loadThread() {
     if (!leadId) return;
@@ -146,6 +167,10 @@ export default function LeadThreadPage() {
   }, [leadId, API_BASE]);
 
   React.useEffect(() => {
+    loadTemplates().catch(() => {});
+  }, [API_BASE]);
+
+  React.useEffect(() => {
     if (q.trim()) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, q]);
@@ -153,6 +178,25 @@ export default function LeadThreadPage() {
   function insertEmoji(value: string) {
     setNewMessage((prev) => `${prev}${value}`);
     setShowEmoji(false);
+  }
+
+  function applySelectedTemplate() {
+    const t = templates.find((x) => String(x.template_id) === templateChoice);
+    if (!t) return;
+    setNewMessage(String(t.body || ""));
+  }
+
+  async function syncTemplates() {
+    try {
+      setSyncingTemplates(true);
+      const r = await apiFetch(`${API_BASE}/api/textdrip/templates/sync`, { method: "POST" });
+      if (!r.ok) throw new Error("Template sync failed");
+      await loadTemplates();
+    } catch {
+      alert("Template sync failed");
+    } finally {
+      setSyncingTemplates(false);
+    }
   }
 
   function openImagePicker() {
@@ -554,6 +598,12 @@ export default function LeadThreadPage() {
                     <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
                     <div className="text-gray-500">{formatTime(m.created_at)}</div>
                   </div>
+                  {m.direction === "out" && m.delivery_status ? (
+                    <div className="mb-1 text-[11px] text-gray-500">
+                      Delivery: {String(m.delivery_status)}
+                      {m.delivery_status_at ? ` (${formatTime(m.delivery_status_at)})` : ""}
+                    </div>
+                  ) : null}
                   <div className="whitespace-pre-wrap text-sm">{m.text}</div>
                 </div>
               ))
@@ -563,6 +613,36 @@ export default function LeadThreadPage() {
           </div>
 
           <div className="border-t pt-3">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <select
+                value={templateChoice}
+                onChange={(e) => setTemplateChoice(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="">Textdrip templates...</option>
+                {templates.map((t) => (
+                  <option key={t.template_id} value={t.template_id}>
+                    {t.name || t.template_id}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={applySelectedTemplate}
+                disabled={!templateChoice}
+                className="border rounded px-2 py-1 text-xs"
+              >
+                Use Template
+              </button>
+              <button
+                type="button"
+                onClick={() => syncTemplates().catch(() => {})}
+                disabled={syncingTemplates}
+                className="border rounded px-2 py-1 text-xs"
+              >
+                {syncingTemplates ? "Syncing..." : "Sync Templates"}
+              </button>
+            </div>
             {mediaUrl ? (
               <div className="mb-2 rounded border border-gray-200 p-2 flex items-center justify-between gap-3">
                 <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline truncate">
