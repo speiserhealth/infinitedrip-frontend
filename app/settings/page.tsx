@@ -12,6 +12,7 @@ type SettingsResponse = {
     textdrip_base_url?: string;
     textdrip_webhook_secret?: string;
     textdrip_webhook_secret_set?: boolean;
+    ai_first_reply_mode?: string;
     ai_quiet_hours_enabled?: boolean;
     ai_quiet_hours_start?: string;
     ai_quiet_hours_end?: string;
@@ -28,6 +29,7 @@ type FormState = {
   textdrip_api_token: string;
   textdrip_base_url: string;
   textdrip_webhook_secret: string;
+  ai_first_reply_mode: "require_prior_outbound" | "allow_first_reply";
   ai_quiet_hours_enabled: boolean;
   ai_quiet_hours_start: string;
   ai_quiet_hours_end: string;
@@ -42,6 +44,7 @@ const INITIAL_FORM: FormState = {
   textdrip_api_token: "",
   textdrip_base_url: "",
   textdrip_webhook_secret: "",
+  ai_first_reply_mode: "require_prior_outbound",
   ai_quiet_hours_enabled: false,
   ai_quiet_hours_start: "22:00",
   ai_quiet_hours_end: "08:00",
@@ -102,6 +105,10 @@ export default function SettingsPage() {
         textdrip_api_token: "",
         textdrip_base_url: String(s.textdrip_base_url || ""),
         textdrip_webhook_secret: String(s.textdrip_webhook_secret || ""),
+        ai_first_reply_mode:
+          String(s.ai_first_reply_mode || "").trim().toLowerCase() === "allow_first_reply"
+            ? "allow_first_reply"
+            : "require_prior_outbound",
         ai_quiet_hours_enabled: !!s.ai_quiet_hours_enabled,
         ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
         ai_quiet_hours_end: String(s.ai_quiet_hours_end || "08:00"),
@@ -151,6 +158,7 @@ export default function SettingsPage() {
     try {
       const payload: Record<string, unknown> = {
         textdrip_base_url: form.textdrip_base_url,
+        ai_first_reply_mode: form.ai_first_reply_mode,
         ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
         ai_quiet_hours_start: form.ai_quiet_hours_start,
         ai_quiet_hours_end: form.ai_quiet_hours_end,
@@ -344,6 +352,26 @@ export default function SettingsPage() {
               </div>
 
               <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
+                <div className="mb-3">
+                  <span className="mb-1 block text-gray-800 font-medium">AI First Reply Mode</span>
+                  <select
+                    value={form.ai_first_reply_mode}
+                    onChange={(e) =>
+                      onField(
+                        "ai_first_reply_mode",
+                        e.target.value === "allow_first_reply" ? "allow_first_reply" : "require_prior_outbound"
+                      )
+                    }
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="require_prior_outbound">Require prior outbound (safer)</option>
+                    <option value="allow_first_reply">Allow AI first reply on brand-new inbound</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Safer default keeps AI from initiating conversations unless your CRM has already texted first.
+                  </p>
+                </div>
+
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <span className="mb-1 block text-gray-800 font-medium">Quiet Hours</span>

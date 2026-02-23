@@ -415,7 +415,7 @@ export default function LeadThreadPage() {
   const currentStatus = normalizeStatus(lead?.status);
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
-  const hot = Number(lead?.hot ?? 0) === 1 || currentStatus === "engaged";
+  const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
 
   return (

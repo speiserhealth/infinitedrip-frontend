@@ -364,7 +364,7 @@ export default function LeadsPage() {
 
     const isWaiting = (l: Lead) => l.lastMessageDirection === "in";
     const inbound = (l: Lead) => Number(l.inboundCount ?? 0);
-    const isHot = (l: Lead) => Number(l.hot ?? 0) === 1 || normalizeStatus(l.status) === "engaged";
+    const isHot = (l: Lead) => Number(l.hot ?? 0) === 1;
 
     const isCold = (l: Lead) => {
       const status = normalizeStatus(l.status);

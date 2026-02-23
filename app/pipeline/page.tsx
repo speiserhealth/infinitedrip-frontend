@@ -191,7 +191,7 @@ export default function PipelinePage() {
   }
 
   function isHot(l: Lead) {
-    return Number(l.hot ?? 0) === 1 || normalizeStatus(l.status) === "engaged";
+    return Number(l.hot ?? 0) === 1;
   }
 
   function leadsFor(status: LeadStatus) {
