@@ -70,6 +70,20 @@ type CalendarStatus = {
   checked_at?: string;
 };
 
+type OnboardingChecklistResponse = {
+  ok?: boolean;
+  checklist?: {
+    steps?: Array<{ key?: string; label?: string; done?: boolean }>;
+  };
+};
+
+type TextdripSetupState = {
+  textdripConnected: boolean;
+  webhookConfigured: boolean;
+  webhookLive: boolean;
+  checkedAt: string;
+};
+
 const INITIAL_FORM: FormState = {
   textdrip_api_token: "",
   textdrip_base_url: "",
@@ -86,6 +100,13 @@ const INITIAL_FORM: FormState = {
   google_client_id: "",
   google_client_secret: "",
   google_refresh_token: "",
+};
+
+const INITIAL_TEXTDRIP_SETUP: TextdripSetupState = {
+  textdripConnected: false,
+  webhookConfigured: false,
+  webhookLive: false,
+  checkedAt: "",
 };
 
 function formatUpdatedAt(value?: string | null) {
@@ -134,6 +155,10 @@ export default function SettingsPage() {
   const [webhookUrl, setWebhookUrl] = React.useState("");
   const [calendarStatus, setCalendarStatus] = React.useState<CalendarStatus | null>(null);
   const [checkingCalendar, setCheckingCalendar] = React.useState(false);
+  const [checkingTextdrip, setCheckingTextdrip] = React.useState(false);
+  const [runningTextdripWizard, setRunningTextdripWizard] = React.useState(false);
+  const [textdripSetup, setTextdripSetup] = React.useState<TextdripSetupState>(INITIAL_TEXTDRIP_SETUP);
+  const [textdripTemplateSource, setTextdripTemplateSource] = React.useState("");
 
   const [faqs, setFaqs] = React.useState<AiFaqRow[]>([]);
   const [faqSaving, setFaqSaving] = React.useState(false);
@@ -198,6 +223,7 @@ export default function SettingsPage() {
     loadSettings();
     loadFaqs().catch(() => {});
     loadCalendarStatus().catch(() => {});
+    loadTextdripSetupStatus().catch(() => {});
   }, []);
 
   React.useEffect(() => {
@@ -243,6 +269,28 @@ export default function SettingsPage() {
       setCalendarStatus((body?.status || null) as CalendarStatus | null);
     } finally {
       setCheckingCalendar(false);
+    }
+  }
+
+  async function loadTextdripSetupStatus() {
+    setCheckingTextdrip(true);
+    try {
+      const res = await apiFetch("/api/onboarding/checklist", { cache: "no-store" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Textdrip status failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const body = (await res.json().catch(() => ({}))) as OnboardingChecklistResponse;
+      const steps = Array.isArray(body?.checklist?.steps) ? body.checklist?.steps || [] : [];
+      const byKey = new Map(steps.map((s) => [String(s?.key || ""), !!s?.done]));
+      setTextdripSetup({
+        textdripConnected: !!byKey.get("textdrip_connected"),
+        webhookConfigured: !!byKey.get("webhook_configured"),
+        webhookLive: !!byKey.get("webhook_live"),
+        checkedAt: new Date().toISOString(),
+      });
+    } finally {
+      setCheckingTextdrip(false);
     }
   }
 
@@ -352,53 +400,83 @@ export default function SettingsPage() {
     onField("appointment_reminder_offsets", next);
   }
 
+  function buildSettingsPayload() {
+    const payload: Record<string, unknown> = {
+      textdrip_base_url: form.textdrip_base_url,
+      ai_first_reply_mode: form.ai_first_reply_mode,
+      ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
+      ai_quiet_hours_start: form.ai_quiet_hours_start,
+      ai_quiet_hours_end: form.ai_quiet_hours_end,
+      ai_max_replies_per_5m: clampMaxReplies(form.ai_max_replies_per_5m),
+      ai_reply_cooldown_minutes: Math.max(
+        0,
+        Math.min(120, Math.floor(Number(form.ai_reply_cooldown_minutes || "2") || 2))
+      ),
+      appointment_reminders_enabled: !!form.appointment_reminders_enabled,
+      appointment_reminder_offsets: normalizeReminderOffsets(form.appointment_reminder_offsets).map((x) => Number(x)),
+      google_calendar_id: form.google_calendar_id,
+      google_client_id: form.google_client_id,
+    };
+    if (form.textdrip_api_token.trim()) payload.textdrip_api_token = form.textdrip_api_token;
+    if (form.textdrip_webhook_secret.trim()) payload.textdrip_webhook_secret = form.textdrip_webhook_secret;
+    if (form.google_client_secret.trim()) payload.google_client_secret = form.google_client_secret;
+    if (form.google_refresh_token.trim()) payload.google_refresh_token = form.google_refresh_token;
+    return payload;
+  }
+
+  async function saveSettingsPayload() {
+    const payload = buildSettingsPayload();
+    const res = await apiFetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Save failed (${res.status}): ${txt || "Unknown error"}`);
+    }
+    await loadSettings();
+    await loadCalendarStatus().catch(() => {});
+    await loadTextdripSetupStatus().catch(() => {});
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     setSuccess("");
-
     try {
-      const payload: Record<string, unknown> = {
-        textdrip_base_url: form.textdrip_base_url,
-        ai_first_reply_mode: form.ai_first_reply_mode,
-        ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
-        ai_quiet_hours_start: form.ai_quiet_hours_start,
-        ai_quiet_hours_end: form.ai_quiet_hours_end,
-        ai_max_replies_per_5m: clampMaxReplies(form.ai_max_replies_per_5m),
-        ai_reply_cooldown_minutes: Math.max(
-          0,
-          Math.min(120, Math.floor(Number(form.ai_reply_cooldown_minutes || "2") || 2))
-        ),
-        appointment_reminders_enabled: !!form.appointment_reminders_enabled,
-        appointment_reminder_offsets: normalizeReminderOffsets(form.appointment_reminder_offsets).map((x) => Number(x)),
-        google_calendar_id: form.google_calendar_id,
-        google_client_id: form.google_client_id,
-      };
-
-      if (form.textdrip_api_token.trim()) payload.textdrip_api_token = form.textdrip_api_token;
-      if (form.textdrip_webhook_secret.trim()) payload.textdrip_webhook_secret = form.textdrip_webhook_secret;
-      if (form.google_client_secret.trim()) payload.google_client_secret = form.google_client_secret;
-      if (form.google_refresh_token.trim()) payload.google_refresh_token = form.google_refresh_token;
-
-      const res = await apiFetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(`Save failed (${res.status}): ${txt || "Unknown error"}`);
-      }
-
+      await saveSettingsPayload();
       setSuccess("Settings saved.");
-      await loadSettings();
-      await loadCalendarStatus().catch(() => {});
     } catch (e: any) {
       setError(String(e?.message || "Save failed"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onRunTextdripWizard() {
+    setRunningTextdripWizard(true);
+    setError("");
+    setSuccess("");
+    try {
+      await saveSettingsPayload();
+      const syncRes = await apiFetch("/api/textdrip/templates/sync", { method: "POST" });
+      if (!syncRes.ok) {
+        const txt = await syncRes.text().catch(() => "");
+        throw new Error(`Textdrip check failed (${syncRes.status}): ${txt || "Unknown error"}`);
+      }
+      const syncBody = await syncRes.json().catch(() => ({}));
+      const synced = Number(syncBody?.synced || 0);
+      setTextdripTemplateSource(String(syncBody?.source_url || ""));
+      await loadTextdripSetupStatus().catch(() => {});
+      setSuccess(
+        `Textdrip check passed. Synced ${synced} template${synced === 1 ? "" : "s"}. If webhook live is still pending, send 1 inbound test SMS then check again.`
+      );
+    } catch (e: any) {
+      setError(String(e?.message || "Textdrip setup check failed"));
+    } finally {
+      setRunningTextdripWizard(false);
     }
   }
 
@@ -437,6 +515,7 @@ export default function SettingsPage() {
       setWebhookUrl(String(data?.webhook_url || ""));
       setForm((prev) => ({ ...prev, textdrip_webhook_secret: String(s.textdrip_webhook_secret || "") }));
       setWebhookSecretSet(!!s.textdrip_webhook_secret_set);
+      await loadTextdripSetupStatus().catch(() => {});
       setSuccess("Webhook secret rotated.");
     } catch (e: any) {
       setError(String(e?.message || "Rotate failed"));
@@ -492,6 +571,38 @@ export default function SettingsPage() {
         <form className="mt-6 space-y-6" onSubmit={onSave}>
           <section className="rounded border border-gray-200 bg-white p-4">
             <h2 className="text-lg font-medium text-gray-900">Textdrip</h2>
+            <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-medium text-blue-900">Quick Connect Wizard</div>
+                <button
+                  type="button"
+                  onClick={() => onRunTextdripWizard()}
+                  disabled={runningTextdripWizard || saving}
+                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-60"
+                >
+                  {runningTextdripWizard ? "Running..." : "Save + Run Check"}
+                </button>
+              </div>
+              <div className="mt-2 grid gap-1 text-xs text-blue-900 md:grid-cols-3">
+                <div className={textdripSetup.textdripConnected ? "font-medium" : ""}>
+                  {textdripSetup.textdripConnected ? "OK" : "Pending"} 1) API token + base URL
+                </div>
+                <div className={textdripSetup.webhookConfigured ? "font-medium" : ""}>
+                  {textdripSetup.webhookConfigured ? "OK" : "Pending"} 2) Webhook secret + URL set
+                </div>
+                <div className={textdripSetup.webhookLive ? "font-medium" : ""}>
+                  {textdripSetup.webhookLive ? "OK" : "Pending"} 3) At least 1 inbound webhook received
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-blue-800">
+                {textdripSetup.checkedAt ? <span>Last check: {formatUpdatedAt(textdripSetup.checkedAt)}</span> : null}
+                {checkingTextdrip ? <span>Refreshing setup status...</span> : null}
+                {textdripTemplateSource ? <span>Template endpoint: {textdripTemplateSource}</span> : null}
+              </div>
+              <p className="mt-2 text-xs text-blue-800">
+                This keeps manual fallback. If Textdrip OAuth is added later, this can become true one-click connect.
+              </p>
+            </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               <label className="block text-sm">
                 <span className="mb-1 block text-gray-700">API Token</span>
