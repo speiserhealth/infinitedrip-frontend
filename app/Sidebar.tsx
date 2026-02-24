@@ -12,9 +12,9 @@ const baseNavItems = [
   { href: "/leads", label: "Leads" },
   { href: "/pipeline", label: "Funnel" },
   { href: "/stats", label: "Stats" },
-  { href: "/billing", label: "Billing" },
   { href: "/settings", label: "Settings" },
 ];
+const billingNavItem = { href: "/billing", label: "Billing" };
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -84,7 +84,19 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-4">
+      <Link
+        href={billingNavItem.href}
+        className={[
+          "mb-3 block rounded px-3 py-2 text-sm",
+          pathname === billingNavItem.href
+            ? "bg-cyan-600/85 text-white shadow-[0_0_14px_rgba(56,189,248,0.45)]"
+            : "text-cyan-100 hover:bg-slate-800/75 hover:text-white",
+        ].join(" ")}
+      >
+        {billingNavItem.label}
+      </Link>
+
+      <div>
         <ThemeToggle />
       </div>
 
