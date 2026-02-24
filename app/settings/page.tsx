@@ -84,6 +84,12 @@ type TextdripSetupState = {
   checkedAt: string;
 };
 
+type TextdripConnectDraft = {
+  apiToken: string;
+  baseUrl: string;
+  webhookSecret: string;
+};
+
 const INITIAL_FORM: FormState = {
   textdrip_api_token: "",
   textdrip_base_url: "",
@@ -107,6 +113,12 @@ const INITIAL_TEXTDRIP_SETUP: TextdripSetupState = {
   webhookConfigured: false,
   webhookLive: false,
   checkedAt: "",
+};
+
+const INITIAL_TEXTDRIP_DRAFT: TextdripConnectDraft = {
+  apiToken: "",
+  baseUrl: "",
+  webhookSecret: "",
 };
 
 function formatUpdatedAt(value?: string | null) {
@@ -159,6 +171,9 @@ export default function SettingsPage() {
   const [runningTextdripWizard, setRunningTextdripWizard] = React.useState(false);
   const [textdripSetup, setTextdripSetup] = React.useState<TextdripSetupState>(INITIAL_TEXTDRIP_SETUP);
   const [textdripTemplateSource, setTextdripTemplateSource] = React.useState("");
+  const [textdripModalOpen, setTextdripModalOpen] = React.useState(false);
+  const [textdripModalSaving, setTextdripModalSaving] = React.useState(false);
+  const [textdripDraft, setTextdripDraft] = React.useState<TextdripConnectDraft>(INITIAL_TEXTDRIP_DRAFT);
 
   const [faqs, setFaqs] = React.useState<AiFaqRow[]>([]);
   const [faqSaving, setFaqSaving] = React.useState(false);
@@ -206,6 +221,12 @@ export default function SettingsPage() {
         google_client_secret: "",
         google_refresh_token: "",
       });
+      setTextdripDraft((prev) => ({
+        ...prev,
+        apiToken: "",
+        baseUrl: String(s.textdrip_base_url || ""),
+        webhookSecret: "",
+      }));
 
       setTokenSet(!!s.textdrip_api_token_set);
       setWebhookSecretSet(!!s.textdrip_webhook_secret_set);
@@ -234,6 +255,17 @@ export default function SettingsPage() {
 
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function openTextdripModal() {
+    setError("");
+    setSuccess("");
+    setTextdripDraft({
+      apiToken: "",
+      baseUrl: String(form.textdrip_base_url || ""),
+      webhookSecret: "",
+    });
+    setTextdripModalOpen(true);
   }
 
   async function loadFaqs() {
@@ -455,21 +487,68 @@ export default function SettingsPage() {
     }
   }
 
+  async function runTextdripConnectionCheck() {
+    const syncRes = await apiFetch("/api/textdrip/templates/sync", { method: "POST" });
+    if (!syncRes.ok) {
+      const txt = await syncRes.text().catch(() => "");
+      throw new Error(`Textdrip check failed (${syncRes.status}): ${txt || "Unknown error"}`);
+    }
+    const syncBody = await syncRes.json().catch(() => ({}));
+    const synced = Number(syncBody?.synced || 0);
+    setTextdripTemplateSource(String(syncBody?.source_url || ""));
+    await loadTextdripSetupStatus().catch(() => {});
+    return synced;
+  }
+
+  async function onSaveTextdripConnect(runCheck = false) {
+    setTextdripModalSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const payload: Record<string, unknown> = {
+        textdrip_base_url: String(textdripDraft.baseUrl || "").trim(),
+      };
+      if (!String(payload.textdrip_base_url || "")) {
+        throw new Error("Textdrip Base URL is required.");
+      }
+      if (textdripDraft.apiToken.trim()) payload.textdrip_api_token = textdripDraft.apiToken.trim();
+      if (textdripDraft.webhookSecret.trim()) payload.textdrip_webhook_secret = textdripDraft.webhookSecret.trim();
+
+      const res = await apiFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Textdrip save failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+
+      await loadSettings();
+      await loadTextdripSetupStatus().catch(() => {});
+
+      if (runCheck) {
+        const synced = await runTextdripConnectionCheck();
+        setSuccess(
+          `Textdrip connected and checked. Synced ${synced} template${synced === 1 ? "" : "s"}. If webhook live is still pending, send 1 inbound test SMS then check again.`
+        );
+      } else {
+        setSuccess("Textdrip credentials saved.");
+      }
+      setTextdripModalOpen(false);
+    } catch (e: any) {
+      setError(String(e?.message || "Textdrip save failed"));
+    } finally {
+      setTextdripModalSaving(false);
+    }
+  }
+
   async function onRunTextdripWizard() {
     setRunningTextdripWizard(true);
     setError("");
     setSuccess("");
     try {
-      await saveSettingsPayload();
-      const syncRes = await apiFetch("/api/textdrip/templates/sync", { method: "POST" });
-      if (!syncRes.ok) {
-        const txt = await syncRes.text().catch(() => "");
-        throw new Error(`Textdrip check failed (${syncRes.status}): ${txt || "Unknown error"}`);
-      }
-      const syncBody = await syncRes.json().catch(() => ({}));
-      const synced = Number(syncBody?.synced || 0);
-      setTextdripTemplateSource(String(syncBody?.source_url || ""));
-      await loadTextdripSetupStatus().catch(() => {});
+      const synced = await runTextdripConnectionCheck();
       setSuccess(
         `Textdrip check passed. Synced ${synced} template${synced === 1 ? "" : "s"}. If webhook live is still pending, send 1 inbound test SMS then check again.`
       );
@@ -574,14 +653,23 @@ export default function SettingsPage() {
             <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="font-medium text-blue-900">Quick Connect Wizard</div>
-                <button
-                  type="button"
-                  onClick={() => onRunTextdripWizard()}
-                  disabled={runningTextdripWizard || saving}
-                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-60"
-                >
-                  {runningTextdripWizard ? "Running..." : "Save + Run Check"}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openTextdripModal}
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500"
+                  >
+                    Connect Textdrip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRunTextdripWizard()}
+                    disabled={runningTextdripWizard || saving}
+                    className="rounded border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-60"
+                  >
+                    {runningTextdripWizard ? "Checking..." : "Check Connection"}
+                  </button>
+                </div>
               </div>
               <div className="mt-2 grid gap-1 text-xs text-blue-900 md:grid-cols-3">
                 <div className={textdripSetup.textdripConnected ? "font-medium" : ""}>
@@ -604,38 +692,13 @@ export default function SettingsPage() {
               </p>
             </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
-              <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">API Token</span>
-                <input
-                  type="password"
-                  value={form.textdrip_api_token}
-                  onChange={(e) => onField("textdrip_api_token", e.target.value)}
-                  placeholder={tokenSet ? "Saved (enter to replace)" : "Paste API token"}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Base URL</span>
-                <input
-                  type="text"
-                  value={form.textdrip_base_url}
-                  onChange={(e) => onField("textdrip_base_url", e.target.value)}
-                  placeholder="https://api.textdrip.com/..."
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
-
-              <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Webhook Secret</span>
-                <input
-                  type="password"
-                  value={form.textdrip_webhook_secret}
-                  onChange={(e) => onField("textdrip_webhook_secret", e.target.value)}
-                  placeholder={webhookSecretSet ? "Saved (enter to replace)" : "Optional secret"}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                />
-              </label>
+              <div className="block text-sm md:col-span-2 rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="font-medium text-gray-800">Stored Textdrip Credentials</div>
+                <div className="mt-1 text-xs text-gray-600">
+                  API token: {tokenSet ? "saved" : "not set"} | Base URL: {form.textdrip_base_url ? "saved" : "not set"} | Webhook secret: {webhookSecretSet ? "saved" : "not set"}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Use Connect Textdrip to add or replace credentials.</p>
+              </div>
 
               <div className="block text-sm">
                 <span className="mb-1 block text-gray-700">Max AI Replies (per 5 min)</span>
@@ -1025,6 +1088,95 @@ export default function SettingsPage() {
           </button>
         </form>
       )}
+
+      {textdripModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close Textdrip modal"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => {
+              if (!textdripModalSaving) setTextdripModalOpen(false);
+            }}
+          />
+          <div className="relative z-10 w-full max-w-xl rounded border border-gray-200 bg-white p-4 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-medium text-gray-900">Connect Textdrip</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!textdripModalSaving) setTextdripModalOpen(false);
+                }}
+                className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              SMS-only integration. Add credentials, then run a connection check.
+            </p>
+
+            <div className="mt-4 grid gap-3">
+              <label className="block text-sm">
+                <span className="mb-1 block text-gray-700">API Token</span>
+                <input
+                  type="password"
+                  value={textdripDraft.apiToken}
+                  onChange={(e) => setTextdripDraft((prev) => ({ ...prev, apiToken: e.target.value }))}
+                  placeholder={tokenSet ? "Saved (enter to replace)" : "Paste API token"}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block text-sm">
+                <span className="mb-1 block text-gray-700">Base URL</span>
+                <input
+                  type="text"
+                  value={textdripDraft.baseUrl}
+                  onChange={(e) => setTextdripDraft((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                  placeholder="https://api.textdrip.com/..."
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block text-sm">
+                <span className="mb-1 block text-gray-700">Webhook Secret (optional)</span>
+                <input
+                  type="password"
+                  value={textdripDraft.webhookSecret}
+                  onChange={(e) => setTextdripDraft((prev) => ({ ...prev, webhookSecret: e.target.value }))}
+                  placeholder={webhookSecretSet ? "Saved (enter to replace)" : "Optional secret"}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+
+              <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+                <div className="font-medium text-gray-700">Inbound Webhook URL</div>
+                <div className="mt-1 break-all">{webhookUrl || "Save credentials first to generate webhook URL."}</div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => onSaveTextdripConnect(false)}
+                disabled={textdripModalSaving}
+                className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50 disabled:opacity-60"
+              >
+                {textdripModalSaving ? "Saving..." : "Save Credentials"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSaveTextdripConnect(true)}
+                disabled={textdripModalSaving}
+                className="rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-60"
+              >
+                {textdripModalSaving ? "Running..." : "Save + Run Check"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
