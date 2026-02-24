@@ -57,9 +57,9 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="flex w-64 flex-col border-r border-border bg-card p-4 text-card-foreground">
+    <aside className="relative z-10 flex w-64 flex-col border-r border-sky-400/20 bg-slate-900/70 p-4 text-slate-100 backdrop-blur-md">
       <div className="mb-6">
-        <div className="text-xl font-semibold">InfiniteDrip</div>
+        <div className="text-xl font-semibold text-slate-100">InfiniteDrip</div>
       </div>
 
       <nav className="flex-1 space-y-1">
@@ -71,7 +71,9 @@ export default function Sidebar() {
               href={item.href}
               className={[
                 "block rounded px-3 py-2 text-sm",
-                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                active
+                  ? "bg-cyan-600/85 text-white shadow-sm shadow-cyan-900/50"
+                  : "text-slate-300 hover:bg-slate-800/70 hover:text-slate-100",
               ].join(" ")}
             >
               {item.label}
@@ -86,7 +88,7 @@ export default function Sidebar() {
 
       <button
         onClick={handleLogout}
-        className="mt-3 rounded border border-border bg-muted px-3 py-2 text-sm text-foreground hover:bg-accent"
+        className="mt-3 rounded border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm text-slate-100 hover:bg-slate-700/80"
       >
         Logout
       </button>
