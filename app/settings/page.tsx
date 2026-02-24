@@ -22,6 +22,8 @@ type SettingsResponse = {
     google_client_id?: string;
     google_client_secret_set?: boolean;
     google_refresh_token_set?: boolean;
+    google_account_email?: string;
+    google_account_email_set?: boolean;
     updated_at?: string | null;
   };
 };
@@ -55,6 +57,8 @@ type AiFaqRow = {
 type CalendarStatus = {
   configured?: boolean;
   connected?: boolean;
+  gmail_connected?: boolean;
+  account_email?: string;
   warning?: string;
   detail?: string;
   calendar_id?: string;
@@ -628,7 +632,7 @@ export default function SettingsPage() {
           </section>
 
           <section className="rounded border border-gray-200 bg-white p-4">
-            <h2 className="text-lg font-medium text-gray-900">Google Calendar</h2>
+            <h2 className="text-lg font-medium text-gray-900">Google Account (Calendar + Gmail)</h2>
             <div className="mt-3">
               <button
                 type="button"
@@ -636,10 +640,10 @@ export default function SettingsPage() {
                 disabled={connectingGoogle}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {connectingGoogle ? "Redirecting..." : "Connect Google Calendar"}
+                {connectingGoogle ? "Redirecting..." : "Connect Google Account"}
               </button>
               <p className="mt-2 text-xs text-gray-500">
-                Recommended: use Connect so users do not need to manually manage OAuth tokens.
+                One connect powers appointment booking plus Gmail compose shortcuts.
               </p>
             </div>
             <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm">
@@ -655,13 +659,19 @@ export default function SettingsPage() {
                 </button>
               </div>
               <div className="mt-1 text-xs text-gray-600">
-                {calendarStatus?.connected
-                  ? "Connected"
-                  : calendarStatus?.configured
-                    ? "Configured but not connected"
-                    : "Not configured"}
-                {calendarStatus?.warning ? ` (${calendarStatus.warning})` : ""}
+                Calendar: {calendarStatus?.connected ? "Connected" : calendarStatus?.configured ? "Configured but not connected" : "Not configured"}
               </div>
+              <div className="mt-1 text-xs text-gray-600">
+                Gmail: {calendarStatus?.gmail_connected ? "Connected" : "Not connected"}
+              </div>
+              {calendarStatus?.account_email ? (
+                <div className="mt-1 text-xs text-gray-500">
+                  Connected Google account: {calendarStatus.account_email}
+                </div>
+              ) : null}
+              {calendarStatus?.warning ? (
+                <div className="mt-1 text-xs text-amber-700">Warning: {calendarStatus.warning}</div>
+              ) : null}
               <div className="mt-1 text-xs text-gray-500">
                 Calendar: {calendarStatus?.calendar_id || form.google_calendar_id || "primary"}
               </div>

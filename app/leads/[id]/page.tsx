@@ -83,11 +83,12 @@ function normalizeEmail(input: string) {
   return s;
 }
 
-function buildGmailComposeUrl(to: string, subject?: string) {
+function buildGmailComposeUrl(to: string, subject?: string, authuser?: string) {
   const qs = new URLSearchParams();
   qs.set("view", "cm");
   qs.set("fs", "1");
   qs.set("to", to);
+  if (authuser) qs.set("authuser", authuser);
   if (subject) qs.set("su", subject);
   return `https://mail.google.com/mail/?${qs.toString()}`;
 }
@@ -120,6 +121,8 @@ export default function LeadThreadPage() {
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [contactEmail, setContactEmail] = React.useState("");
+  const [googleConnectedEmail, setGoogleConnectedEmail] = React.useState("");
+  const [googleGmailConnected, setGoogleGmailConnected] = React.useState(false);
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -194,6 +197,24 @@ export default function LeadThreadPage() {
     if (!emailFromLead) return;
     setContactEmail((prev) => prev || emailFromLead);
   }, [lead?.email]);
+
+  React.useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await apiFetch(`${API_BASE}/api/integrations/google/status`, { cache: "no-store" });
+        if (!r.ok) return;
+        const body = await r.json().catch(() => ({}));
+        const status = body?.status || {};
+        if (dead) return;
+        setGoogleGmailConnected(!!status?.gmail_connected);
+        setGoogleConnectedEmail(normalizeEmail(String(status?.account_email || "")));
+      } catch {}
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [API_BASE]);
 
   React.useEffect(() => {
     loadTemplates().catch(() => {});
@@ -459,7 +480,7 @@ export default function LeadThreadPage() {
       saveContactEmail(to);
     }
     const subject = `InfiniteDrip - ${String(lead?.name || lead?.phone || "Lead")}`;
-    const url = buildGmailComposeUrl(to, subject);
+    const url = buildGmailComposeUrl(to, subject, googleConnectedEmail || undefined);
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -528,6 +549,11 @@ export default function LeadThreadPage() {
             >
               Email via Gmail
             </button>
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            {googleGmailConnected
+              ? `Connected Google account: ${googleConnectedEmail || "connected"}`
+              : "Tip: Connect Google in Settings to align Gmail + Calendar on one account."}
           </div>
         </div>
 
