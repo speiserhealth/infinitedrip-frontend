@@ -62,7 +62,7 @@ type LeadIntegrityResult = {
   }>;
 };
 
-type Tab = "pending" | "approved" | "rejected";
+type Tab = "all" | "pending" | "approved" | "rejected";
 type BillingDraft = {
   billing_status: "trial" | "active" | "past_due" | "canceled" | "none";
   trial_ends_at: string;
@@ -70,7 +70,7 @@ type BillingDraft = {
   stripe_subscription_id: string;
 };
 
-const TABS: Tab[] = ["pending", "approved", "rejected"];
+const TABS: Tab[] = ["all", "pending", "approved", "rejected"];
 
 function fmtDate(v?: string | null) {
   if (!v) return "";
@@ -86,10 +86,21 @@ function healthClass(status?: string) {
   return "border-amber-400/40 bg-amber-500/10 text-amber-200";
 }
 
+function normalizeApprovalStatus(v?: string): "pending" | "approved" | "rejected" {
+  const s = String(v || "").trim().toLowerCase();
+  if (s === "approved" || s === "rejected" || s === "pending") return s;
+  return "pending";
+}
+
+function tabLabel(tab: Tab) {
+  if (tab === "all") return "All";
+  return tab[0].toUpperCase() + tab.slice(1);
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = React.useState<UserRow[]>([]);
   const [status, setStatus] = React.useState<AdminStatus>({});
-  const [tab, setTab] = React.useState<Tab>("pending");
+  const [tab, setTab] = React.useState<Tab>("all");
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
@@ -175,7 +186,7 @@ export default function AdminUsersPage() {
     load(tab);
   }, [tab]);
 
-  async function runAction(id: number, action: "approve" | "reject" | "delete" | "resend-approval-email" | "send-reset-email") {
+  async function runAction(id: number, action: "approve" | "reject" | "delete" | "delete-account" | "resend-approval-email" | "send-reset-email") {
     setBusyId(id);
     setError("");
     try {
@@ -184,6 +195,10 @@ export default function AdminUsersPage() {
       if (action === "delete") {
         url = `/api/admin/users/${id}`;
         method = "DELETE";
+      }
+      if (action === "delete-account") {
+        url = `/api/admin/users/${id}/delete-account`;
+        method = "POST";
       }
       const r = await apiFetch(url, { method });
       if (!r.ok) {
@@ -447,7 +462,7 @@ export default function AdminUsersPage() {
               tab === t ? "bg-slate-900 text-white border-slate-900" : "bg-card/70 text-muted-foreground border-border hover:bg-muted/40",
             ].join(" ")}
           >
-            {t[0].toUpperCase() + t.slice(1)}
+            {tabLabel(t)}
           </button>
         ))}
       </div>
@@ -455,13 +470,14 @@ export default function AdminUsersPage() {
       {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
       {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : null}
 
-      {!loading && users.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No users in this tab.</p> : null}
+      {!loading && users.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No users in this view.</p> : null}
 
       {!loading && users.length > 0 ? (
         <div className="mt-4 space-y-2">
           {users.map((u) => {
             const fullName = [u.first_name, u.last_name].filter(Boolean).join(" ") || "(No name)";
             const busy = busyId === u.id;
+            const approval = normalizeApprovalStatus(u.approval_status);
             const draft = billingByUser[u.id] || {
               billing_status: (String(u?.billing_status || "trial").toLowerCase() as BillingDraft["billing_status"]) || "trial",
               trial_ends_at: String(u?.trial_ends_at || ""),
@@ -478,39 +494,54 @@ export default function AdminUsersPage() {
                     Created: {fmtDate(u.createdAt)}
                     {u.approved_at ? ` | Approved: ${fmtDate(u.approved_at)}` : ""}
                   </div>
+                  <div className="mt-1 text-xs text-muted-foreground">Access: {approval}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Billing: {String(u.billing_status || "trial")} | Trial ends: {fmtDate(u.trial_ends_at) || "n/a"}
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {tab !== "approved" ? (
+                  {approval !== "approved" ? (
                     <button
                       onClick={() => runAction(u.id, "approve").catch((e) => setError(String(e?.message || "Approve failed")))}
                       disabled={busy}
                       className="rounded bg-green-600 text-white text-sm px-3 py-2 hover:bg-emerald-500 disabled:opacity-60"
                     >
-                      Approve
+                      {approval === "rejected" ? "Re-enable Access" : "Enable Access"}
                     </button>
                   ) : null}
 
-                  {tab !== "rejected" ? (
+                  {approval !== "rejected" ? (
                     <button
                       onClick={() => runAction(u.id, "reject").catch((e) => setError(String(e?.message || "Reject failed")))}
                       disabled={busy}
                       className="rounded bg-yellow-600 text-white text-sm px-3 py-2 hover:bg-amber-500 disabled:opacity-60"
                     >
-                      Reject
+                      {approval === "approved" ? "Disable Access" : "Reject"}
                     </button>
                   ) : null}
 
-                  {tab === "pending" || tab === "rejected" ? (
+                  <button
+                    onClick={() => {
+                      if (!window.confirm(`Delete account for ${u.email}? This removes all user data.`)) return;
+                      runAction(u.id, "delete-account").catch((e) => setError(String(e?.message || "Delete account failed")));
+                    }}
+                    disabled={busy}
+                    className="rounded bg-red-600 text-white text-sm px-3 py-2 hover:bg-rose-500 disabled:opacity-60"
+                  >
+                    Delete Account
+                  </button>
+
+                  {approval === "pending" || approval === "rejected" ? (
                     <button
-                      onClick={() => runAction(u.id, "delete").catch((e) => setError(String(e?.message || "Delete failed")))}
+                      onClick={() => {
+                        if (!window.confirm(`Delete pending user ${u.email}?`)) return;
+                        runAction(u.id, "delete").catch((e) => setError(String(e?.message || "Delete failed")));
+                      }}
                       disabled={busy}
-                      className="rounded bg-red-600 text-white text-sm px-3 py-2 hover:bg-rose-500 disabled:opacity-60"
+                      className="rounded border border-rose-400/50 text-rose-200 text-sm px-3 py-2 hover:bg-rose-500/10 disabled:opacity-60"
                     >
-                      Delete
+                      Delete Pending User
                     </button>
                   ) : null}
 
