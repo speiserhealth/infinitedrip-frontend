@@ -17,14 +17,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const hideSidebar = PUBLIC_PATHS.has(pathname);
 
   if (hideSidebar) {
-    return <main style={{ minHeight: "100vh" }}>{children}</main>;
+    return <main className="min-h-screen bg-background text-foreground">{children}</main>;
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar />
-      <main style={{ flex: 1, padding: 24 }}>{children}</main>
+      <main className="flex-1 p-6">{children}</main>
     </div>
   );
 }
-
