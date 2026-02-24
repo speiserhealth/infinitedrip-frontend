@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import { apiFetch } from "@/lib/apiFetch";
@@ -84,6 +85,27 @@ export default function DashboardPage() {
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
+
+      <section className="mt-6 overflow-hidden rounded-xl border border-cyan-300/30 bg-slate-900/70 shadow-[0_0_36px_rgba(56,189,248,0.16)]">
+        <div className="grid items-center gap-2 md:grid-cols-[1.4fr_1fr]">
+          <div className="relative min-h-[170px] md:min-h-[220px]">
+            <Image
+              src="/infinity-hero.svg"
+              alt="InfiniteDrip infinity brand graphic"
+              fill
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/10 via-slate-900/5 to-slate-950/30" />
+          </div>
+          <div className="p-4 md:p-6">
+            <div className="text-xl font-semibold tracking-wide text-cyan-300 md:text-2xl">INFINITE DRIP</div>
+            <p className="mt-2 text-sm text-cyan-100/85">
+              AI SMS appointment setting with lead tracking, booking, and follow-up in one view.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="mt-6 rounded-xl border border-border/80 bg-card/70 p-4">
         <div className="flex items-center justify-between gap-3">
