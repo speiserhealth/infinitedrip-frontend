@@ -40,6 +40,26 @@ type FormState = {
   google_refresh_token: string;
 };
 
+type AiFaqRow = {
+  id: number;
+  question: string;
+  answer: string;
+  active: number;
+  priority: number;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+type CalendarStatus = {
+  configured?: boolean;
+  connected?: boolean;
+  warning?: string;
+  detail?: string;
+  calendar_id?: string;
+  next_event_at?: string | null;
+  checked_at?: string;
+};
+
 const INITIAL_FORM: FormState = {
   textdrip_api_token: "",
   textdrip_base_url: "",
@@ -83,6 +103,15 @@ export default function SettingsPage() {
   const [googleClientSecretSet, setGoogleClientSecretSet] = React.useState(false);
   const [googleRefreshTokenSet, setGoogleRefreshTokenSet] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState("");
+  const [calendarStatus, setCalendarStatus] = React.useState<CalendarStatus | null>(null);
+  const [checkingCalendar, setCheckingCalendar] = React.useState(false);
+
+  const [faqs, setFaqs] = React.useState<AiFaqRow[]>([]);
+  const [faqSaving, setFaqSaving] = React.useState(false);
+  const [faqBusyId, setFaqBusyId] = React.useState<number | null>(null);
+  const [newFaqQuestion, setNewFaqQuestion] = React.useState("");
+  const [newFaqAnswer, setNewFaqAnswer] = React.useState("");
+  const [newFaqPriority, setNewFaqPriority] = React.useState("100");
 
   const [form, setForm] = React.useState<FormState>(INITIAL_FORM);
   const [googleStatus, setGoogleStatus] = React.useState("");
@@ -133,6 +162,8 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     loadSettings();
+    loadFaqs().catch(() => {});
+    loadCalendarStatus().catch(() => {});
   }, []);
 
   React.useEffect(() => {
@@ -143,6 +174,133 @@ export default function SettingsPage() {
 
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function loadFaqs() {
+    const res = await apiFetch("/api/ai/faqs?limit=200", { cache: "no-store" });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`FAQ load failed (${res.status}): ${txt || "Unknown error"}`);
+    }
+    const body = await res.json().catch(() => ({}));
+    const list = Array.isArray(body?.faqs) ? body.faqs : [];
+    setFaqs(
+      list.map((x: any) => ({
+        id: Number(x?.id || 0),
+        question: String(x?.question || ""),
+        answer: String(x?.answer || ""),
+        active: Number(x?.active || 0) ? 1 : 0,
+        priority: Number(x?.priority || 100),
+        updated_at: x?.updated_at || null,
+        created_at: x?.created_at || null,
+      }))
+    );
+  }
+
+  async function loadCalendarStatus() {
+    setCheckingCalendar(true);
+    try {
+      const res = await apiFetch("/api/appointments/status", { cache: "no-store" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Calendar status failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const body = await res.json().catch(() => ({}));
+      setCalendarStatus((body?.status || null) as CalendarStatus | null);
+    } finally {
+      setCheckingCalendar(false);
+    }
+  }
+
+  async function createFaq() {
+    const question = String(newFaqQuestion || "").trim();
+    const answer = String(newFaqAnswer || "").trim();
+    const priority = Math.max(1, Math.min(999, Math.floor(Number(newFaqPriority || "100") || 100)));
+    if (!question || !answer) {
+      throw new Error("Question and answer are required.");
+    }
+    setFaqSaving(true);
+    try {
+      const res = await apiFetch("/api/ai/faqs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, answer, priority, active: true }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`FAQ create failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      setNewFaqQuestion("");
+      setNewFaqAnswer("");
+      setNewFaqPriority("100");
+      await loadFaqs();
+      setSuccess("AI FAQ added.");
+    } finally {
+      setFaqSaving(false);
+    }
+  }
+
+  async function toggleFaqActive(row: AiFaqRow) {
+    setFaqBusyId(row.id);
+    try {
+      const res = await apiFetch(`/api/ai/faqs/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: row.active === 1 ? 0 : 1 }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`FAQ update failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      await loadFaqs();
+    } finally {
+      setFaqBusyId(null);
+    }
+  }
+
+  async function editFaq(row: AiFaqRow) {
+    const nextQuestion = window.prompt("Question", row.question);
+    if (nextQuestion === null) return;
+    const nextAnswer = window.prompt("Answer", row.answer);
+    if (nextAnswer === null) return;
+    const nextPriority = window.prompt("Priority (1-999, lower is stronger)", String(row.priority || 100));
+    if (nextPriority === null) return;
+    const priority = Math.max(1, Math.min(999, Math.floor(Number(nextPriority || "100") || 100)));
+
+    setFaqBusyId(row.id);
+    try {
+      const res = await apiFetch(`/api/ai/faqs/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: String(nextQuestion || "").trim(),
+          answer: String(nextAnswer || "").trim(),
+          priority,
+        }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`FAQ edit failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      await loadFaqs();
+    } finally {
+      setFaqBusyId(null);
+    }
+  }
+
+  async function removeFaq(row: AiFaqRow) {
+    if (!window.confirm("Delete this FAQ?")) return;
+    setFaqBusyId(row.id);
+    try {
+      const res = await apiFetch(`/api/ai/faqs/${row.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`FAQ delete failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      await loadFaqs();
+    } finally {
+      setFaqBusyId(null);
+    }
   }
 
   function applyMaxRepliesPreset(nextValue: number) {
@@ -185,6 +343,7 @@ export default function SettingsPage() {
 
       setSuccess("Settings saved.");
       await loadSettings();
+      await loadCalendarStatus().catch(() => {});
     } catch (e: any) {
       setError(String(e?.message || "Save failed"));
     } finally {
@@ -458,6 +617,43 @@ export default function SettingsPage() {
                 Recommended: use Connect so users do not need to manually manage OAuth tokens.
               </p>
             </div>
+            <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-medium text-gray-800">Connection Status</div>
+                <button
+                  type="button"
+                  onClick={() => loadCalendarStatus().catch((e) => setError(String(e?.message || "Calendar check failed")))}
+                  disabled={checkingCalendar}
+                  className="rounded border border-gray-300 px-3 py-1.5 text-xs hover:bg-white disabled:opacity-60"
+                >
+                  {checkingCalendar ? "Checking..." : "Check"}
+                </button>
+              </div>
+              <div className="mt-1 text-xs text-gray-600">
+                {calendarStatus?.connected
+                  ? "Connected"
+                  : calendarStatus?.configured
+                    ? "Configured but not connected"
+                    : "Not configured"}
+                {calendarStatus?.warning ? ` (${calendarStatus.warning})` : ""}
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                Calendar: {calendarStatus?.calendar_id || form.google_calendar_id || "primary"}
+              </div>
+              {calendarStatus?.next_event_at ? (
+                <div className="mt-1 text-xs text-gray-500">
+                  Next event: {formatUpdatedAt(String(calendarStatus.next_event_at))}
+                </div>
+              ) : null}
+              {calendarStatus?.checked_at ? (
+                <div className="mt-1 text-xs text-gray-500">
+                  Last check: {formatUpdatedAt(String(calendarStatus.checked_at))}
+                </div>
+              ) : null}
+              {calendarStatus?.detail ? (
+                <div className="mt-1 text-xs text-red-600 break-all">{calendarStatus.detail}</div>
+              ) : null}
+            </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               <label className="block text-sm">
                 <span className="mb-1 block text-gray-700">Calendar ID</span>
@@ -502,6 +698,94 @@ export default function SettingsPage() {
                   className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 />
               </label>
+            </div>
+          </section>
+
+          <section className="rounded border border-gray-200 bg-white p-4">
+            <h2 className="text-lg font-medium text-gray-900">AI FAQ Guardrails</h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Add approved Q&A so AI uses your preferred responses for common lead questions.
+            </p>
+
+            <div className="mt-3 grid gap-2 md:grid-cols-4">
+              <input
+                type="text"
+                value={newFaqQuestion}
+                onChange={(e) => setNewFaqQuestion(e.target.value)}
+                placeholder="Question"
+                className="rounded border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+              />
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={newFaqPriority}
+                onChange={(e) => setNewFaqPriority(e.target.value)}
+                placeholder="Priority"
+                className="rounded border border-gray-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => createFaq().catch((e) => setError(String(e?.message || "FAQ create failed")))}
+                disabled={faqSaving}
+                className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
+              >
+                {faqSaving ? "Adding..." : "Add FAQ"}
+              </button>
+              <textarea
+                value={newFaqAnswer}
+                onChange={(e) => setNewFaqAnswer(e.target.value)}
+                placeholder="Approved answer"
+                rows={3}
+                className="rounded border border-gray-300 px-3 py-2 text-sm md:col-span-4"
+              />
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {faqs.length === 0 ? (
+                <div className="text-xs text-gray-500">No FAQ guardrails yet.</div>
+              ) : (
+                faqs.map((row) => {
+                  const busy = faqBusyId === row.id;
+                  return (
+                    <div key={row.id} className="rounded border border-gray-200 p-3 text-sm">
+                      <div className="font-medium text-gray-900">{row.question}</div>
+                      <div className="mt-1 whitespace-pre-wrap text-gray-700">{row.answer}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                        <span>Priority {row.priority}</span>
+                        <span>{row.active ? "Active" : "Disabled"}</span>
+                        {row.updated_at ? <span>Updated {formatUpdatedAt(row.updated_at)}</span> : null}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleFaqActive(row).catch((e) => setError(String(e?.message || "FAQ update failed")))}
+                          disabled={busy}
+                          className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          {row.active ? "Disable" : "Enable"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => editFaq(row).catch((e) => setError(String(e?.message || "FAQ edit failed")))}
+                          disabled={busy}
+                          className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeFaq(row).catch((e) => setError(String(e?.message || "FAQ delete failed")))}
+                          disabled={busy}
+                          className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </section>
 

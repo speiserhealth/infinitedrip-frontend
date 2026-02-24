@@ -62,6 +62,7 @@ export default function SignupPage() {
         const code = String(body?.error || "");
         if (code === "email_exists") setError("An account with that email already exists.");
         else if (code === "invite_required") setError("A valid invite is required to sign up.");
+        else if (code === "invite_invalid") setError("This invite is invalid, revoked, or expired.");
         else if (code === "invite_email_mismatch") setError("This invite is for a different email address.");
         else if (code === "agreement_required") setError("You must accept the User Agreement.");
         else if (code === "weak_password") setError("Password must be at least 8 characters.");

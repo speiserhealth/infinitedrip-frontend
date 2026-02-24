@@ -39,7 +39,9 @@ type InviteRow = {
   created_by?: string;
   created_at?: string;
   expires_at?: string;
+  revoked_at?: string | null;
   used_at?: string | null;
+  status?: string;
 };
 
 type LeadIntegrityResult = {
@@ -185,6 +187,18 @@ export default function AdminUsersPage() {
     const body = await r.json().catch(() => ({}));
     setInviteUrl(String(body?.signup_url || ""));
     setInviteEmail("");
+    await load(tab);
+  }
+
+  async function revokeInvite(id: number) {
+    setError("");
+    const r = await apiFetch(`/api/admin/invites/${id}/revoke`, {
+      method: "POST",
+    });
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      throw new Error(`Revoke invite failed (${r.status}): ${txt}`);
+    }
     await load(tab);
   }
 
@@ -448,8 +462,18 @@ export default function AdminUsersPage() {
           <div className="mt-2 space-y-2">
             {invites.map((inv) => (
               <div key={inv.id} className="text-xs text-gray-700 border border-gray-100 rounded p-2">
-                <div>ID {inv.id} | role {inv.role || "agent"} | email {inv.email || "(any)"}</div>
-                <div>Created: {fmtDate(inv.created_at)} | Expires: {fmtDate(inv.expires_at)} | Used: {inv.used_at ? fmtDate(inv.used_at) : "no"}</div>
+                <div>ID {inv.id} | role {inv.role || "agent"} | email {inv.email || "(any)"} | status {inv.status || "unknown"}</div>
+                <div>
+                  Created: {fmtDate(inv.created_at)} | Expires: {fmtDate(inv.expires_at)} | Revoked: {inv.revoked_at ? fmtDate(inv.revoked_at) : "no"} | Used: {inv.used_at ? fmtDate(inv.used_at) : "no"}
+                </div>
+                {!inv.used_at && !inv.revoked_at ? (
+                  <button
+                    onClick={() => revokeInvite(inv.id).catch((e) => setError(String(e?.message || "Revoke invite failed")))}
+                    className="mt-2 rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                  >
+                    Revoke
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
