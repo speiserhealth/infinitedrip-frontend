@@ -23,6 +23,10 @@ type Lead = {
   inbound_count?: number | null;
   inbound?: number | null;
   source?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  lead_timezone?: string | null;
   hot?: number | null;
   archived?: number | null;
   archived_at?: string | null;
@@ -123,6 +127,10 @@ function normalizeLead(raw: any): Lead {
     lastMessageAt,
     inboundCount: Number(inboundCount ?? 0),
     source: String(raw?.source || "manual"),
+    city: String(raw?.city || "").trim(),
+    state: String(raw?.state || "").trim(),
+    zip: String(raw?.zip || "").trim(),
+    lead_timezone: String(raw?.lead_timezone || "").trim(),
     hot: Number(raw?.hot ?? 0),
     archived: Number(raw?.archived ?? 0),
     archived_at: raw?.archived_at ?? null,
@@ -507,6 +515,7 @@ export default function LeadsPage() {
                 <th className="text-left px-3 py-1.5">Lead</th>
                 <th className="text-left px-3 py-1.5">Status</th>
                 <th className="text-left px-3 py-1.5">Source</th>
+                <th className="text-left px-3 py-1.5">TZ</th>
                 <th className="text-left px-3 py-1.5">Created</th>
                 <th className="text-left px-3 py-1.5">Age</th>
                 <th className="text-left px-3 py-1.5">Last msg</th>
@@ -546,6 +555,9 @@ export default function LeadsPage() {
                     </td>
 
                     <td className="px-3 py-1.5">{renderSourceBadge(l.source)}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                      {String(l.lead_timezone || "").trim() || "-"}
+                    </td>
 
                     <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{formatCreated(l.createdAt)}</td>
                     <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{formatAge(l.createdAt)}</td>
@@ -579,7 +591,7 @@ export default function LeadsPage() {
 
               {sortedLeads.length === 0 ? (
                 <tr className="border-t">
-                  <td className="px-3 py-5 text-sm text-muted-foreground" colSpan={8}>
+                  <td className="px-3 py-5 text-sm text-muted-foreground" colSpan={9}>
                     No leads yet.
                   </td>
                 </tr>

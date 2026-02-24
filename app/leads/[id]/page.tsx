@@ -12,6 +12,10 @@ type Lead = {
   name?: string | null;
   phone?: string | null;
   email?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  lead_timezone?: string | null;
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
   notes?: string | null;
@@ -335,7 +339,10 @@ export default function LeadThreadPage() {
           endDateTime: end.toISOString(),
           summary: bookingTitle.trim() || `Appointment - ${lead?.name || lead?.phone || "Lead"}`,
           description: bookingDescription.trim(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York",
+          timeZone:
+            String(lead?.lead_timezone || "").trim() ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone ||
+            "America/New_York",
         }),
       });
 
@@ -495,6 +502,12 @@ export default function LeadThreadPage() {
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
+  const leadCity = String(lead?.city || "").trim();
+  const leadState = String(lead?.state || "").trim();
+  const leadZip = String(lead?.zip || "").trim();
+  const leadTz = String(lead?.lead_timezone || "").trim();
+  const leadLocation = [[leadCity, leadState].filter(Boolean).join(", "), leadZip].filter(Boolean).join(" ").trim();
+  const leadLocationLine = [leadLocation, leadTz ? `(${leadTz})` : ""].filter(Boolean).join(" ");
 
   return (
     <div className="mx-auto flex h-[85vh] max-w-[1280px] flex-col rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-6">
@@ -519,6 +532,7 @@ export default function LeadThreadPage() {
             ) : null}
           </div>
           <div className="text-sm text-muted-foreground">{lead?.phone}</div>
+          <div className="text-xs text-muted-foreground">{leadLocationLine}</div>
           <div className="mt-2 flex items-center gap-2">
             <input
               type="email"
@@ -632,6 +646,9 @@ export default function LeadThreadPage() {
 
           <div className="rounded-lg border border-border/70 bg-card/70 p-3 shadow-sm">
             <div className="text-sm font-medium mb-2">Book Appointment</div>
+            <div className="mb-2 text-xs text-muted-foreground">
+              Lead timezone: {leadTz || "Not detected (using your browser timezone)"}
+            </div>
             <div className="grid gap-2">
               <label className="text-sm">
                 <span className="mb-1 block text-muted-foreground">Start</span>
