@@ -42,6 +42,7 @@ export default function Sidebar() {
         { href: "/admin/users", label: "User Approvals" },
         { href: "/admin/audit", label: "Audit Log" },
         { href: "/admin/textdrip", label: "Textdrip Debug" },
+        { href: "/admin/email", label: "Email Debug" },
       ]
     : baseNavItems;
 
