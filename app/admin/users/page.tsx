@@ -10,7 +10,7 @@ type UserRow = {
   last_name?: string;
   phone?: string;
   createdAt?: string;
-  approval_status?: "pending" | "approved" | "rejected" | string;
+  approval_status?: "pending" | "approved" | "suspended" | "rejected" | string;
   approved_at?: string | null;
   billing_status?: "trial" | "active" | "past_due" | "canceled" | "none" | string;
   trial_ends_at?: string | null;
@@ -24,6 +24,7 @@ type AdminStatus = {
   user_counts?: {
     pending?: number;
     approved?: number;
+    suspended?: number;
     rejected?: number;
   };
   setup_checks?: Array<{
@@ -62,7 +63,7 @@ type LeadIntegrityResult = {
   }>;
 };
 
-type Tab = "all" | "pending" | "approved" | "rejected";
+type Tab = "all" | "pending" | "approved" | "suspended" | "rejected";
 type BillingDraft = {
   billing_status: "trial" | "active" | "past_due" | "canceled" | "none";
   trial_ends_at: string;
@@ -70,7 +71,7 @@ type BillingDraft = {
   stripe_subscription_id: string;
 };
 
-const TABS: Tab[] = ["all", "pending", "approved", "rejected"];
+const TABS: Tab[] = ["all", "pending", "approved", "suspended", "rejected"];
 
 function fmtDate(v?: string | null) {
   if (!v) return "";
@@ -86,9 +87,9 @@ function healthClass(status?: string) {
   return "border-amber-400/40 bg-amber-500/10 text-amber-200";
 }
 
-function normalizeApprovalStatus(v?: string): "pending" | "approved" | "rejected" {
+function normalizeApprovalStatus(v?: string): "pending" | "approved" | "suspended" | "rejected" {
   const s = String(v || "").trim().toLowerCase();
-  if (s === "approved" || s === "rejected" || s === "pending") return s;
+  if (s === "approved" || s === "suspended" || s === "rejected" || s === "pending") return s;
   return "pending";
 }
 
@@ -186,7 +187,7 @@ export default function AdminUsersPage() {
     load(tab);
   }, [tab]);
 
-  async function runAction(id: number, action: "approve" | "reject" | "delete" | "delete-account" | "resend-approval-email" | "send-reset-email") {
+  async function runAction(id: number, action: "approve" | "reject" | "suspend" | "reactivate" | "delete" | "delete-account" | "resend-approval-email" | "send-reset-email") {
     setBusyId(id);
     setError("");
     try {
@@ -324,7 +325,7 @@ export default function AdminUsersPage() {
         <p className="mt-3 text-sm text-rose-400">Admin access required.</p>
       ) : null}
 
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="mt-4 grid gap-3 md:grid-cols-5">
         <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
           <div className="text-muted-foreground">Pending</div>
           <div className="text-xl font-semibold">{Number(status.user_counts?.pending || 0)}</div>
@@ -332,6 +333,10 @@ export default function AdminUsersPage() {
         <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
           <div className="text-muted-foreground">Approved</div>
           <div className="text-xl font-semibold">{Number(status.user_counts?.approved || 0)}</div>
+        </div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Suspended</div>
+          <div className="text-xl font-semibold">{Number(status.user_counts?.suspended || 0)}</div>
         </div>
         <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
           <div className="text-muted-foreground">Rejected</div>
@@ -501,23 +506,43 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {approval !== "approved" ? (
+                  {approval !== "approved" && approval !== "suspended" ? (
                     <button
                       onClick={() => runAction(u.id, "approve").catch((e) => setError(String(e?.message || "Approve failed")))}
                       disabled={busy}
                       className="rounded bg-green-600 text-white text-sm px-3 py-2 hover:bg-emerald-500 disabled:opacity-60"
                     >
-                      {approval === "rejected" ? "Re-enable Access" : "Enable Access"}
+                      Enable Access
                     </button>
                   ) : null}
 
-                  {approval !== "rejected" ? (
+                  {approval === "suspended" ? (
+                    <button
+                      onClick={() => runAction(u.id, "reactivate").catch((e) => setError(String(e?.message || "Reactivate failed")))}
+                      disabled={busy}
+                      className="rounded bg-green-600 text-white text-sm px-3 py-2 hover:bg-emerald-500 disabled:opacity-60"
+                    >
+                      Reactivate Access
+                    </button>
+                  ) : null}
+
+                  {approval === "approved" ? (
+                    <button
+                      onClick={() => runAction(u.id, "suspend").catch((e) => setError(String(e?.message || "Suspend failed")))}
+                      disabled={busy}
+                      className="rounded bg-yellow-600 text-white text-sm px-3 py-2 hover:bg-amber-500 disabled:opacity-60"
+                    >
+                      Disable Access
+                    </button>
+                  ) : null}
+
+                  {approval === "pending" ? (
                     <button
                       onClick={() => runAction(u.id, "reject").catch((e) => setError(String(e?.message || "Reject failed")))}
                       disabled={busy}
                       className="rounded bg-yellow-600 text-white text-sm px-3 py-2 hover:bg-amber-500 disabled:opacity-60"
                     >
-                      {approval === "approved" ? "Disable Access" : "Reject"}
+                      Reject
                     </button>
                   ) : null}
 
