@@ -34,11 +34,11 @@ type LeadsResponse = {
 };
 
 const STATUS_STYLE: Record<LeadStatus, string> = {
-  engaged: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  booked: "bg-green-100 text-green-800 border-green-300",
-  sold: "bg-indigo-100 text-indigo-800 border-indigo-300",
-  cold: "bg-cyan-100 text-cyan-800 border-cyan-300",
-  dead: "bg-red-100 text-red-700 border-red-300",
+  engaged: "border-amber-400/40 bg-amber-500/15 text-amber-300",
+  booked: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+  sold: "border-indigo-400/40 bg-indigo-500/15 text-indigo-300",
+  cold: "border-cyan-400/40 bg-cyan-500/15 text-cyan-300",
+  dead: "border-rose-400/40 bg-rose-500/15 text-rose-300",
 };
 
 function normalizeStatus(s: any): LeadStatus {
@@ -85,28 +85,28 @@ function renderSourceBadge(v?: string | null) {
 
   if (s === "textdrip" || s === "inbound_webhook") {
     return (
-      <span className="text-[11px] px-2 py-1 rounded border bg-blue-100 text-blue-800 border-blue-300">
+      <span className="text-[11px] rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-cyan-300">
         Textdrip
       </span>
     );
   }
   if (s === "csv_import") {
     return (
-      <span className="text-[11px] px-2 py-1 rounded border bg-green-100 text-green-800 border-green-300">
+      <span className="text-[11px] rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-1 text-emerald-300">
         CSV
       </span>
     );
   }
   if (s === "manual") {
     return (
-      <span className="text-[11px] px-2 py-1 rounded border bg-gray-100 text-gray-800 border-gray-300">
+      <span className="text-[11px] rounded border border-border/70 bg-muted/60 px-2 py-1 text-muted-foreground">
         Manual
       </span>
     );
   }
 
   return (
-    <span className="text-[11px] px-2 py-1 rounded border bg-purple-100 text-purple-800 border-purple-300">
+    <span className="text-[11px] rounded border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-indigo-300">
       {s}
     </span>
   );
@@ -398,28 +398,28 @@ export default function LeadsPage() {
   }, [leads, sort]);
 
   return (
-    <div className="p-4 md:p-5 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-5">
       <div className="mb-3 flex flex-col md:flex-row md:items-start md:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">Leads</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Leads</h1>
           {counts ? (
-            <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-gray-700">
+            <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
               {Object.entries(counts).map(([k, v]) => (
-                <span key={k} className="px-1.5 py-0.5 rounded border bg-gray-50">
+                <span key={k} className="rounded border border-border/70 bg-muted/40 px-1.5 py-0.5">
                   {k}: <span className="font-semibold">{v}</span>
                 </span>
               ))}
             </div>
           ) : null}
-          {error ? <div className="mt-2 text-sm text-red-600">{error}</div> : null}
+          {error ? <div className="mt-2 text-sm text-rose-400">{error}</div> : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="text-xs text-gray-600">Sort</div>
+          <div className="text-xs text-muted-foreground">Sort</div>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="border rounded px-2 py-1.5 text-xs"
+            className="rounded border border-border bg-card px-2 py-1.5 text-xs text-foreground"
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
@@ -427,7 +427,7 @@ export default function LeadsPage() {
           <select
             value={view}
             onChange={(e) => setView(e.target.value as LeadView)}
-            className="border rounded px-2 py-1.5 text-xs"
+            className="rounded border border-border bg-card px-2 py-1.5 text-xs text-foreground"
             title="Lead view"
           >
             <option value="active">Active</option>
@@ -435,37 +435,37 @@ export default function LeadsPage() {
             <option value="all">All records</option>
           </select>
 
-          <Link href="/pipeline" className="text-sm text-blue-600 underline">
+          <Link href="/pipeline" className="text-sm text-cyan-400 underline decoration-cyan-500/40">
             Funnel
           </Link>
-          <Link href="/stats" className="text-sm text-blue-600 underline">
+          <Link href="/stats" className="text-sm text-cyan-400 underline decoration-cyan-500/40">
             Stats
           </Link>
-          <Link href="/dashboard" className="text-sm text-blue-600 underline">
+          <Link href="/dashboard" className="text-sm text-cyan-400 underline decoration-cyan-500/40">
             Dashboard
           </Link>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-        <form onSubmit={handleAddLead} className="border rounded-lg p-3 bg-white shadow-sm">
-          <div className="font-medium mb-1.5 text-sm">Add lead</div>
+        <form onSubmit={handleAddLead} className="rounded-xl border border-border/80 bg-card/70 p-3 shadow-sm">
+          <div className="mb-1.5 text-sm font-medium text-foreground">Add lead</div>
           <div className="grid grid-cols-1 gap-1.5">
             <input
-              className="border rounded px-2.5 py-1.5 text-sm"
+              className="rounded border border-border bg-background/40 px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
               placeholder="Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
             <input
-              className="border rounded px-2.5 py-1.5 text-sm"
+              className="rounded border border-border bg-background/40 px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
               placeholder="Phone (required)"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
             <button
               disabled={adding}
-              className="border rounded px-3 py-1.5 text-sm bg-gray-50 hover:bg-gray-100"
+              className="rounded border border-border bg-muted px-3 py-1.5 text-sm text-foreground hover:bg-accent"
               type="submit"
             >
               {adding ? "Adding…" : "Add"}
@@ -473,36 +473,36 @@ export default function LeadsPage() {
           </div>
         </form>
 
-        <form onSubmit={handleImport} className="border rounded-lg p-3 bg-white shadow-sm">
-          <div className="font-medium mb-1.5 text-sm">Import CSV</div>
-          <div className="text-xs text-gray-500 mb-1.5">CSV columns: name, phone</div>
+        <form onSubmit={handleImport} className="rounded-xl border border-border/80 bg-card/70 p-3 shadow-sm">
+          <div className="mb-1.5 text-sm font-medium text-foreground">Import CSV</div>
+          <div className="mb-1.5 text-xs text-muted-foreground">CSV columns: name, phone</div>
           <div className="grid grid-cols-1 gap-1.5">
             <input
               type="file"
               accept=".csv,text/csv"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="text-sm"
+              className="text-sm text-muted-foreground"
             />
             <button
               disabled={importing || !file}
-              className="border rounded px-3 py-1.5 text-sm bg-gray-50 hover:bg-gray-100"
+              className="rounded border border-border bg-muted px-3 py-1.5 text-sm text-foreground hover:bg-accent"
               type="submit"
             >
               {importing ? "Importing…" : "Import"}
             </button>
-            {importResult ? <div className="text-xs text-green-700">{importResult}</div> : null}
+            {importResult ? <div className="text-xs text-emerald-300">{importResult}</div> : null}
           </div>
         </form>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
-        <div className="px-3 py-2 border-b font-medium text-sm">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card/70 shadow-sm">
+        <div className="border-b border-border/70 px-3 py-2 text-sm font-medium text-foreground">
           {sortedLeads.length} lead{sortedLeads.length === 1 ? "" : "s"}
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs md:text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+            <thead className="bg-muted/40 text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-1.5">Lead</th>
                 <th className="text-left px-3 py-1.5">Status</th>
@@ -523,13 +523,13 @@ export default function LeadsPage() {
                 const hot = Number(l.inboundCount ?? 0) >= 3;
 
                 return (
-                  <tr key={l.id} className="border-t hover:bg-gray-50">
+                  <tr key={l.id} className="border-t border-border/70 hover:bg-muted/30">
                     <td className="px-3 py-1.5">
                       <div className="flex flex-col">
-                        <Link className="text-blue-600 underline leading-tight" href={`/leads/${l.id}`}>
+                        <Link className="leading-tight text-cyan-400 underline decoration-cyan-500/40" href={`/leads/${l.id}`}>
                           {l.name || l.phone || `Lead #${l.id}`}
                         </Link>
-                        <div className="text-[11px] text-gray-500">{l.phone}</div>
+                        <div className="text-[11px] text-muted-foreground">{l.phone}</div>
                       </div>
                     </td>
 
@@ -537,20 +537,20 @@ export default function LeadsPage() {
                       <span className={`inline-flex items-center gap-1.5 border rounded px-1.5 py-0.5 text-[11px] ${cls}`}>
                         {st}
                         {waiting ? (
-                          <span className="text-[10px] px-1 py-0.5 rounded border bg-white">waiting</span>
+                          <span className="rounded border border-amber-400/40 bg-amber-500/15 px-1 py-0.5 text-[10px] text-amber-200">waiting</span>
                         ) : null}
                         {hot ? (
-                          <span className="text-[10px] px-1 py-0.5 rounded border bg-white">hot</span>
+                          <span className="rounded border border-rose-400/40 bg-rose-500/15 px-1 py-0.5 text-[10px] text-rose-200">hot</span>
                         ) : null}
                       </span>
                     </td>
 
                     <td className="px-3 py-1.5">{renderSourceBadge(l.source)}</td>
 
-                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{formatCreated(l.createdAt)}</td>
-                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{formatAge(l.createdAt)}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{formatCreated(l.createdAt)}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{formatAge(l.createdAt)}</td>
 
-                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                    <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
                       {l.lastMessageAt ? formatCreated(l.lastMessageAt) : "-"}
                     </td>
 
@@ -560,14 +560,14 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={() => handleArchiveLead(l.id, Number(l.archived ?? 0) !== 1)}
-                          className="text-[11px] px-2 py-0.5 rounded border bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100"
+                          className="rounded border border-border bg-muted px-2 py-0.5 text-[11px] text-foreground hover:bg-accent"
                         >
                           {Number(l.archived ?? 0) === 1 ? "Unarchive" : "Archive"}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteLead(l.id)}
-                          className="text-[11px] px-2 py-0.5 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                          className="rounded border border-rose-400/40 bg-rose-500/15 px-2 py-0.5 text-[11px] text-rose-300 hover:bg-rose-500/25"
                         >
                           Delete
                         </button>
@@ -579,7 +579,7 @@ export default function LeadsPage() {
 
               {sortedLeads.length === 0 ? (
                 <tr className="border-t">
-                  <td className="px-3 py-5 text-sm text-gray-500" colSpan={8}>
+                  <td className="px-3 py-5 text-sm text-muted-foreground" colSpan={8}>
                     No leads yet.
                   </td>
                 </tr>

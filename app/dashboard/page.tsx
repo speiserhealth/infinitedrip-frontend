@@ -69,44 +69,52 @@ export default function DashboardPage() {
   }, [checklist]);
 
   return (
-    <main className="p-6">
+    <main className="rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Account setup and upcoming appointments.</p>
+          <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Account setup and upcoming appointments.</p>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+          className="rounded border border-border bg-card px-3 py-2 text-sm text-foreground hover:bg-muted"
         >
           Log out
         </button>
       </div>
 
-      {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
 
-      <section className="mt-6 rounded border border-gray-200 bg-white p-4">
+      <section className="mt-6 rounded-xl border border-border/80 bg-card/70 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-medium">First-Login Setup Checklist</h2>
-          <div className="text-sm text-gray-600">
+          <h2 className="text-lg font-medium text-foreground">First-Login Setup Checklist</h2>
+          <div className="text-sm text-muted-foreground">
             {completion.done}/{completion.total} complete
           </div>
         </div>
-        <div className="mt-2 h-2 rounded bg-gray-100">
-          <div className="h-2 rounded bg-green-500" style={{ width: `${completion.pct}%` }} />
+        <div className="mt-2 h-2 rounded bg-muted">
+          <div className="h-2 rounded bg-emerald-500" style={{ width: `${completion.pct}%` }} />
         </div>
 
         {loading ? (
-          <p className="mt-3 text-sm text-gray-500">Loading checklist...</p>
+          <p className="mt-3 text-sm text-muted-foreground">Loading checklist...</p>
         ) : checklist.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">No checklist steps returned.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No checklist steps returned.</p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {checklist.map((step) => (
-              <li key={step.key} className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2">
-                <span className="text-sm text-gray-800">{step.label}</span>
+            {checklist.map((step, idx) => (
+              <li
+                key={step.key}
+                className="flex items-center justify-between gap-3 rounded border border-border/60 bg-background/40 px-3 py-2"
+                style={{ animationDelay: `${idx * 35}ms` }}
+              >
+                <span className="text-sm text-foreground">{step.label}</span>
                 <span
-                  className={`rounded px-2 py-0.5 text-xs ${step.done ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-800"}`}
+                  className={`rounded border px-2 py-0.5 text-xs ${
+                    step.done
+                      ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+                      : "border-amber-400/40 bg-amber-500/15 text-amber-300"
+                  }`}
                 >
                   {step.done ? "Done" : "Pending"}
                 </span>
@@ -116,24 +124,24 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <section className="mt-4 rounded border border-gray-200 bg-white p-4">
-        <h2 className="text-lg font-medium">Upcoming appointments</h2>
-        {loading ? <p className="mt-3 text-sm text-gray-500">Loading appointments...</p> : null}
+      <section className="mt-4 rounded-xl border border-border/80 bg-card/70 p-4">
+        <h2 className="text-lg font-medium text-foreground">Upcoming appointments</h2>
+        {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading appointments...</p> : null}
         {!loading && appointments.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">No upcoming appointments.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No upcoming appointments.</p>
         ) : null}
         {!loading && appointments.length > 0 ? (
           <ul className="mt-3 space-y-2">
             {appointments.map((a) => (
-              <li key={a.id} className="rounded border border-gray-100 px-3 py-2">
-                <div className="font-medium text-gray-900">{a.title}</div>
-                <div className="text-xs text-gray-500">
+              <li key={a.id} className="rounded border border-border/60 bg-background/40 px-3 py-2">
+                <div className="font-medium text-foreground">{a.title}</div>
+                <div className="text-xs text-muted-foreground">
                   {a.start || "no start"} to {a.end || "no end"}
                   {a.link ? (
                     <>
                       {" "}
                       •{" "}
-                      <a className="text-blue-600 underline" href={a.link} target="_blank" rel="noreferrer">
+                      <a className="text-cyan-400 underline decoration-cyan-500/40" href={a.link} target="_blank" rel="noreferrer">
                         open
                       </a>
                     </>

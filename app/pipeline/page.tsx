@@ -37,11 +37,11 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
 };
 
 const COL_STYLE: Record<LeadStatus, string> = {
-  engaged: "bg-yellow-50 border-yellow-300",
-  cold: "bg-cyan-50 border-cyan-300",
-  booked: "bg-green-50 border-green-300",
-  sold: "bg-indigo-50 border-indigo-300",
-  dead: "bg-red-50 border-red-300",
+  engaged: "bg-amber-500/10 border-amber-400/35",
+  cold: "bg-cyan-500/10 border-cyan-400/35",
+  booked: "bg-emerald-500/10 border-emerald-400/35",
+  sold: "bg-indigo-500/10 border-indigo-400/35",
+  dead: "bg-rose-500/10 border-rose-400/35",
 };
 
 function normalizeStatus(s: any): LeadStatus {
@@ -88,28 +88,28 @@ function renderSourceBadge(v?: string | null) {
 
   if (s === "textdrip" || s === "inbound_webhook") {
     return (
-      <span className="text-[10px] px-2 py-1 rounded border bg-blue-100 text-blue-800 border-blue-300">
+      <span className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-[10px] text-cyan-300">
         Textdrip
       </span>
     );
   }
   if (s === "csv_import") {
     return (
-      <span className="text-[10px] px-2 py-1 rounded border bg-green-100 text-green-800 border-green-300">
+      <span className="rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-1 text-[10px] text-emerald-300">
         CSV
       </span>
     );
   }
   if (s === "manual") {
     return (
-      <span className="text-[10px] px-2 py-1 rounded border bg-gray-100 text-gray-800 border-gray-300">
+      <span className="rounded border border-border/70 bg-muted/60 px-2 py-1 text-[10px] text-muted-foreground">
         Manual
       </span>
     );
   }
 
   return (
-    <span className="text-[10px] px-2 py-1 rounded border bg-purple-100 text-purple-800 border-purple-300">
+    <span className="rounded border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-[10px] text-indigo-300">
       {s}
     </span>
   );
@@ -305,34 +305,34 @@ export default function PipelinePage() {
   }
 
   return (
-    <div className="p-6 h-[90vh] flex flex-col">
+    <div className="flex h-[90vh] flex-col rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Funnel</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Funnel</h1>
 
         <div className="flex items-center gap-3">
-          <div className="text-sm text-gray-600">Sort</div>
+          <div className="text-sm text-muted-foreground">Sort</div>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="border rounded px-2 py-2 text-sm"
+            className="rounded border border-border bg-card px-2 py-2 text-sm text-foreground"
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
           </select>
 
-          {busy ? <div className="text-xs text-gray-500">Saving…</div> : null}
+          {busy ? <div className="text-xs text-muted-foreground">Saving…</div> : null}
 
-          <Link href="/leads" className="text-blue-600 underline">
+          <Link href="/leads" className="text-cyan-400 underline decoration-cyan-500/40">
             Leads
           </Link>
 
-          <Link href="/dashboard" className="text-blue-600 underline">
+          <Link href="/dashboard" className="text-cyan-400 underline decoration-cyan-500/40">
             Dashboard
           </Link>
         </div>
       </div>
 
-      {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
+      {error && <div className="mb-3 text-sm text-rose-400">{error}</div>}
 
       <div className="flex-1 grid grid-cols-5 gap-4 overflow-x-auto">
         {COLUMNS.map((col) => {
@@ -344,17 +344,17 @@ export default function PipelinePage() {
               onDragOver={(e) => onDragOverColumn(e, col)}
               onDragLeave={() => setDragOver(null)}
               onDrop={(e) => onDropColumn(e, col)}
-              className={`border rounded-lg p-3 flex flex-col ${COL_STYLE[col]} ${isOver ? "ring-2 ring-blue-400" : ""}`}
+              className={`flex flex-col rounded-xl border p-3 ${COL_STYLE[col]} ${isOver ? "ring-2 ring-cyan-400" : ""}`}
             >
               <div className="mb-3 flex items-center justify-between">
-                <div className="font-medium">{STATUS_LABEL[col]}</div>
+                <div className="font-medium text-foreground">{STATUS_LABEL[col]}</div>
                 <div className="flex items-center gap-2">
                   <select
                     value={columnRange[col]}
                     onChange={(e) =>
                       setColumnRange((prev) => ({ ...prev, [col]: e.target.value as RangeKey }))
                     }
-                    className="text-[11px] border rounded px-1.5 py-0.5 bg-white"
+                    className="rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-foreground"
                     title="Date range"
                   >
                     <option value="3">3d</option>
@@ -363,7 +363,7 @@ export default function PipelinePage() {
                     <option value="90">90d</option>
                     <option value="all">All</option>
                   </select>
-                  <div className="text-xs text-gray-500">{leadsFor(col).length}</div>
+                  <div className="text-xs text-muted-foreground">{leadsFor(col).length}</div>
                 </div>
               </div>
 
@@ -374,12 +374,12 @@ export default function PipelinePage() {
                   const cold = isCold(l);
 
                   const cardClass = waiting
-                    ? "bg-orange-50 border-orange-300"
+                    ? "bg-amber-500/15 border-amber-400/45"
                     : hot
-                    ? "bg-red-50 border-red-300"
+                    ? "bg-rose-500/15 border-rose-400/45"
                     : cold
-                    ? "bg-blue-50 border-blue-300"
-                    : "bg-white border-gray-200";
+                    ? "bg-cyan-500/15 border-cyan-400/45"
+                    : "bg-card/75 border-border/70";
 
                   return (
                     <div
@@ -387,27 +387,27 @@ export default function PipelinePage() {
                       draggable
                       onDragStart={(e) => onDragStart(e, l.id)}
                       onDragEnd={onDragEnd}
-                      className={`border rounded-md p-2 shadow-sm hover:shadow transition cursor-grab active:cursor-grabbing ${cardClass}`}
+                      className={`cursor-grab rounded-md border p-2 shadow-sm transition hover:shadow active:cursor-grabbing ${cardClass}`}
                     >
                       <Link href={`/leads/${l.id}`} className="block">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-medium truncate">
+                          <div className="truncate text-sm font-medium text-foreground">
                             {l.name || l.phone || `Lead #${l.id}`}
                           </div>
 
                           <div className="flex items-center gap-1 flex-wrap justify-end">
                             {waiting ? (
-                              <span className="text-[10px] px-2 py-1 rounded border bg-orange-100 text-orange-800 border-orange-300">
+                              <span className="rounded border border-amber-400/40 bg-amber-500/15 px-2 py-1 text-[10px] text-amber-200">
                                 WAITING
                               </span>
                             ) : null}
                             {hot ? (
-                              <span className="text-[10px] px-2 py-1 rounded border bg-red-100 text-red-800 border-red-300">
+                              <span className="rounded border border-rose-400/40 bg-rose-500/15 px-2 py-1 text-[10px] text-rose-200">
                                 HOT
                               </span>
                             ) : null}
                             {!waiting && !hot && cold ? (
-                              <span className="text-[10px] px-2 py-1 rounded border bg-blue-100 text-blue-900 border-blue-300">
+                              <span className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-1 text-[10px] text-cyan-200">
                                 COLD
                               </span>
                             ) : null}
@@ -422,8 +422,8 @@ export default function PipelinePage() {
                               }}
                               className={`text-[11px] px-2 py-1 rounded border ${
                                 hot
-                                  ? "bg-orange-100 border-orange-300 text-orange-800"
-                                  : "bg-white border-gray-300 text-gray-600"
+                                  ? "border-orange-300/50 bg-orange-500/15 text-orange-200"
+                                  : "border-border bg-card text-muted-foreground"
                               }`}
                               title={hot ? "Unset hot" : "Set hot"}
                             >
@@ -436,7 +436,7 @@ export default function PipelinePage() {
                                 e.stopPropagation();
                                 setArchived(l.id, true).catch(() => {});
                               }}
-                              className="text-[11px] px-2 py-1 rounded border bg-white border-gray-300 text-gray-600"
+                              className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground"
                               title="Archive lead"
                             >
                               Archive
@@ -444,14 +444,14 @@ export default function PipelinePage() {
                           </div>
                         </div>
 
-                        <div className="text-xs text-gray-600">{l.phone}</div>
+                        <div className="text-xs text-muted-foreground">{l.phone}</div>
 
-                        <div className="text-[11px] text-gray-500 mt-1 flex justify-between">
+                        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
                           <span>Created: {formatCreated(l.createdAt)}</span>
                           <span>Age: {formatAge(l.createdAt)}</span>
                         </div>
 
-                        <div className="text-[11px] text-gray-500 mt-1 flex justify-between">
+                        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
                           <span>Inbound: {Number(l.inboundCount ?? 0)}</span>
                           {l.lastMessageAt ? <span>Last: {formatCreated(l.lastMessageAt)}</span> : <span />}
                         </div>
@@ -461,7 +461,7 @@ export default function PipelinePage() {
                 })}
 
                 {leadsFor(col).length === 0 && (
-                  <div className="text-xs text-gray-400 italic">No leads</div>
+                  <div className="text-xs italic text-muted-foreground">No leads</div>
                 )}
               </div>
             </div>
