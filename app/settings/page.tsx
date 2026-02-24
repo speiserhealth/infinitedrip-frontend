@@ -18,6 +18,8 @@ type SettingsResponse = {
     ai_quiet_hours_end?: string;
     ai_max_replies_per_5m?: number;
     ai_reply_cooldown_minutes?: number;
+    appointment_reminders_enabled?: boolean;
+    appointment_reminder_offsets?: number[] | string;
     google_calendar_id?: string;
     google_client_id?: string;
     google_client_secret_set?: boolean;
@@ -38,6 +40,8 @@ type FormState = {
   ai_quiet_hours_end: string;
   ai_max_replies_per_5m: string;
   ai_reply_cooldown_minutes: string;
+  appointment_reminders_enabled: boolean;
+  appointment_reminder_offsets: string[];
   google_calendar_id: string;
   google_client_id: string;
   google_client_secret: string;
@@ -76,6 +80,8 @@ const INITIAL_FORM: FormState = {
   ai_quiet_hours_end: "08:00",
   ai_max_replies_per_5m: "20",
   ai_reply_cooldown_minutes: "2",
+  appointment_reminders_enabled: false,
+  appointment_reminder_offsets: [],
   google_calendar_id: "",
   google_client_id: "",
   google_client_secret: "",
@@ -94,6 +100,22 @@ function clampMaxReplies(value: string) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 20;
   return Math.max(1, Math.min(100, Math.floor(n)));
+}
+
+function normalizeReminderOffsets(raw: unknown): string[] {
+  const vals = Array.isArray(raw)
+    ? raw
+    : String(raw || "")
+        .split(/[,\s;]+/)
+        .filter(Boolean);
+  const set = new Set<string>();
+  for (const v of vals) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    const m = Math.floor(n);
+    if (m === 15 || m === 30 || m === 60) set.add(String(m));
+  }
+  return Array.from(set).sort((a, b) => Number(a) - Number(b));
 }
 
 export default function SettingsPage() {
@@ -152,6 +174,8 @@ export default function SettingsPage() {
         ai_reply_cooldown_minutes: String(
           Math.max(0, Math.min(120, Math.floor(Number(s.ai_reply_cooldown_minutes ?? 2) || 2)))
         ),
+        appointment_reminders_enabled: !!s.appointment_reminders_enabled,
+        appointment_reminder_offsets: normalizeReminderOffsets(s.appointment_reminder_offsets),
         google_calendar_id: String(s.google_calendar_id || ""),
         google_client_id: String(s.google_client_id || ""),
         google_client_secret: "",
@@ -317,6 +341,17 @@ export default function SettingsPage() {
     onField("ai_max_replies_per_5m", String(clampMaxReplies(String(nextValue))));
   }
 
+  function toggleReminderOffset(offset: "15" | "30" | "60") {
+    const current = Array.isArray(form.appointment_reminder_offsets)
+      ? form.appointment_reminder_offsets
+      : [];
+    const has = current.includes(offset);
+    const next = has
+      ? current.filter((x) => x !== offset)
+      : [...current, offset].sort((a, b) => Number(a) - Number(b));
+    onField("appointment_reminder_offsets", next);
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -335,6 +370,8 @@ export default function SettingsPage() {
           0,
           Math.min(120, Math.floor(Number(form.ai_reply_cooldown_minutes || "2") || 2))
         ),
+        appointment_reminders_enabled: !!form.appointment_reminders_enabled,
+        appointment_reminder_offsets: normalizeReminderOffsets(form.appointment_reminder_offsets).map((x) => Number(x)),
         google_calendar_id: form.google_calendar_id,
         google_client_id: form.google_client_id,
       };
@@ -538,6 +575,50 @@ export default function SettingsPage() {
                   Prevents immediate back-to-back AI auto replies for the same lead.
                 </p>
               </label>
+
+              <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="mb-1 block text-gray-800 font-medium">Auto-text Appointment Reminders</span>
+                    <p className="text-xs text-gray-500">
+                      Send reminder SMS before booked appointments. Choose one, all, or none.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onField("appointment_reminders_enabled", !form.appointment_reminders_enabled)}
+                    className={`rounded px-3 py-2 text-sm ${
+                      form.appointment_reminders_enabled
+                        ? "bg-gray-900 text-white hover:bg-gray-800"
+                        : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {form.appointment_reminders_enabled ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(["15", "30", "60"] as const).map((offset) => {
+                    const active = form.appointment_reminder_offsets.includes(offset);
+                    return (
+                      <button
+                        key={offset}
+                        type="button"
+                        onClick={() => toggleReminderOffset(offset)}
+                        className={`rounded border px-3 py-1.5 text-xs ${
+                          active
+                            ? "bg-blue-100 border-blue-300 text-blue-800"
+                            : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {offset === "60" ? "1 hour before" : `${offset} min before`}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.appointment_reminders_enabled && form.appointment_reminder_offsets.length === 0 ? (
+                  <p className="mt-2 text-xs text-amber-700">Select at least one reminder time.</p>
+                ) : null}
+              </div>
 
               <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
                 <div className="mb-3">
