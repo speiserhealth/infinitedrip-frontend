@@ -83,34 +83,34 @@
 .dark {
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
+  --card: oklch(0.235 0.038 264.2);
   --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
+  --popover: oklch(0.235 0.038 264.2);
   --popover-foreground: oklch(0.984 0.003 247.858);
   --primary: oklch(0.929 0.013 255.508);
   --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
+  --secondary: oklch(0.31 0.038 260.0);
   --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
+  --muted: oklch(0.31 0.038 260.0);
+  --muted-foreground: oklch(0.86 0.02 256.8);
   --accent: oklch(0.279 0.041 260.031);
   --accent-foreground: oklch(0.984 0.003 247.858);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 22%);
   --ring: oklch(0.551 0.027 264.364);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar: oklch(0.19 0.04 264.6);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent: oklch(0.34 0.03 260.0);
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 18%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
@@ -120,5 +120,40 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Make legacy Tailwind gray utilities readable in dark mode pages. */
+  .dark .text-gray-400 { color: rgb(209 213 219); }
+  .dark .text-gray-500 { color: rgb(229 231 235); }
+  .dark .text-gray-600 { color: rgb(243 244 246); }
+  .dark .text-gray-700 { color: rgb(249 250 251); }
+  .dark .text-gray-800 { color: rgb(255 255 255); }
+  .dark .text-gray-900 { color: rgb(255 255 255); }
+  .dark .text-red-600 { color: rgb(248 113 113); }
+  .dark .text-green-700 { color: rgb(74 222 128); }
+  .dark .text-yellow-800 { color: rgb(253 224 71); }
+  .dark .text-blue-600 { color: rgb(103 232 249); }
+  .dark .text-purple-800 { color: rgb(196 181 253); }
+
+  .dark .bg-white { background-color: rgb(30 41 59); }
+  .dark .bg-gray-50 { background-color: rgb(51 65 85); }
+  .dark .bg-gray-100 { background-color: rgb(71 85 105); }
+
+  .dark .border-gray-100,
+  .dark .border-gray-200,
+  .dark .border-gray-300 {
+    border-color: rgb(100 116 139);
+  }
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    color: rgb(248 250 252);
+    background-color: rgba(15, 23, 42, 0.55);
+  }
+
+  .dark select option {
+    color: rgb(248 250 252);
+    background-color: rgb(15 23 42);
   }
 }
