@@ -57,9 +57,11 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="relative z-10 flex w-64 flex-col border-r border-sky-400/20 bg-slate-900/70 p-4 text-slate-100 backdrop-blur-md">
+    <aside className="relative z-10 flex w-64 flex-col border-r border-sky-300/25 bg-slate-900/85 p-4 text-slate-100 shadow-[0_0_30px_rgba(56,189,248,0.10)] backdrop-blur-md">
       <div className="mb-6">
-        <div className="text-xl font-semibold text-slate-100">InfiniteDrip</div>
+        <div className="text-2xl font-extrabold tracking-[0.12em] text-cyan-300 drop-shadow-[0_0_24px_rgba(56,189,248,0.72)]">
+          INFINITE DRIP
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1">
@@ -72,8 +74,8 @@ export default function Sidebar() {
               className={[
                 "block rounded px-3 py-2 text-sm",
                 active
-                  ? "bg-cyan-600/85 text-white shadow-sm shadow-cyan-900/50"
-                  : "text-slate-300 hover:bg-slate-800/70 hover:text-slate-100",
+                  ? "bg-cyan-600/85 text-white shadow-[0_0_14px_rgba(56,189,248,0.45)]"
+                  : "text-cyan-100 hover:bg-slate-800/75 hover:text-white",
               ].join(" ")}
             >
               {item.label}
@@ -88,7 +90,7 @@ export default function Sidebar() {
 
       <button
         onClick={handleLogout}
-        className="mt-3 rounded border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm text-slate-100 hover:bg-slate-700/80"
+        className="mt-3 rounded border border-slate-600 bg-slate-800/85 px-3 py-2 text-sm text-cyan-100 hover:bg-slate-700/90"
       >
         Logout
       </button>

@@ -122,6 +122,18 @@
     @apply bg-background text-foreground;
   }
 
+  /* Unify dark-mode page headings with the brand cyan accent. */
+  .dark h1,
+  .dark h2,
+  .dark h1.text-foreground,
+  .dark h2.text-foreground {
+    color: rgb(207 250 254);
+  }
+  .dark h3,
+  .dark h3.text-foreground {
+    color: rgb(186 230 253);
+  }
+
   /* Make legacy Tailwind gray utilities readable in dark mode pages. */
   .dark .text-gray-400 { color: rgb(209 213 219); }
   .dark .text-gray-500 { color: rgb(229 231 235); }

@@ -1,5 +1,0 @@
-export async function apiFetch(url: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers || {});
-  headers.set("x-user-id", "demo"); // TEMP: force demo for testing
-  return fetch(url, { ...init, headers });
-}
