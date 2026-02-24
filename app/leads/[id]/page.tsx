@@ -11,6 +11,7 @@ type Lead = {
   id: number;
   name?: string | null;
   phone?: string | null;
+  email?: string | null;
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
   notes?: string | null;
@@ -75,6 +76,22 @@ function normalizeStatus(s: any): LeadStatus {
   return "engaged";
 }
 
+function normalizeEmail(input: string) {
+  const s = String(input || "").trim().toLowerCase();
+  if (!s) return "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return "";
+  return s;
+}
+
+function buildGmailComposeUrl(to: string, subject?: string) {
+  const qs = new URLSearchParams();
+  qs.set("view", "cm");
+  qs.set("fs", "1");
+  qs.set("to", to);
+  if (subject) qs.set("su", subject);
+  return `https://mail.google.com/mail/?${qs.toString()}`;
+}
+
 export default function LeadThreadPage() {
   const params = useParams();
   const idParam = params?.id;
@@ -102,6 +119,7 @@ export default function LeadThreadPage() {
   const [updatingAi, setUpdatingAi] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
+  const [contactEmail, setContactEmail] = React.useState("");
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -145,6 +163,11 @@ export default function LeadThreadPage() {
 
   React.useEffect(() => {
     if (!leadId) return;
+    try {
+      const stored = window.localStorage.getItem(`lead_email_${String(leadId)}`) || "";
+      const normalized = normalizeEmail(stored);
+      if (normalized) setContactEmail(normalized);
+    } catch {}
 
     let dead = false;
 
@@ -165,6 +188,12 @@ export default function LeadThreadPage() {
       clearInterval(t);
     };
   }, [leadId, API_BASE]);
+
+  React.useEffect(() => {
+    const emailFromLead = normalizeEmail(String(lead?.email || ""));
+    if (!emailFromLead) return;
+    setContactEmail((prev) => prev || emailFromLead);
+  }, [lead?.email]);
 
   React.useEffect(() => {
     loadTemplates().catch(() => {});
@@ -406,6 +435,34 @@ export default function LeadThreadPage() {
     }
   }
 
+  function saveContactEmail(value: string) {
+    const normalized = normalizeEmail(value);
+    if (!normalized) return false;
+    setContactEmail(normalized);
+    if (leadId) {
+      try {
+        window.localStorage.setItem(`lead_email_${String(leadId)}`, normalized);
+      } catch {}
+    }
+    return true;
+  }
+
+  function openGmailCompose() {
+    let to = normalizeEmail(contactEmail || String(lead?.email || ""));
+    if (!to) {
+      const typed = window.prompt("Enter lead email address");
+      to = normalizeEmail(String(typed || ""));
+      if (!to) {
+        alert("Please enter a valid email address.");
+        return;
+      }
+      saveContactEmail(to);
+    }
+    const subject = `InfiniteDrip - ${String(lead?.name || lead?.phone || "Lead")}`;
+    const url = buildGmailComposeUrl(to, subject);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   const filtered = React.useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return messages;
@@ -441,6 +498,37 @@ export default function LeadThreadPage() {
             ) : null}
           </div>
           <div className="text-sm text-gray-500">{lead?.phone}</div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              onBlur={(e) => {
+                const value = String(e.target.value || "").trim();
+                if (!value) return;
+                if (!saveContactEmail(value)) {
+                  alert("Invalid email format.");
+                }
+              }}
+              placeholder="lead@email.com"
+              className="w-64 max-w-full border rounded px-2 py-1.5 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const value = String(contactEmail || "").trim();
+                if (value && !saveContactEmail(value)) {
+                  alert("Invalid email format.");
+                  return;
+                }
+                openGmailCompose();
+              }}
+              className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm hover:bg-gray-50"
+              title="Open Gmail compose"
+            >
+              Email via Gmail
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col items-end gap-2">
