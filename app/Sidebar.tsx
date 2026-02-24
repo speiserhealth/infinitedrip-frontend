@@ -11,6 +11,7 @@ const baseNavItems = [
   { href: "/leads", label: "Leads" },
   { href: "/pipeline", label: "Funnel" },
   { href: "/stats", label: "Stats" },
+  { href: "/billing", label: "Billing" },
   { href: "/settings", label: "Settings" },
 ];
 

@@ -17,6 +17,7 @@ type SettingsResponse = {
     ai_quiet_hours_start?: string;
     ai_quiet_hours_end?: string;
     ai_max_replies_per_5m?: number;
+    ai_reply_cooldown_minutes?: number;
     google_calendar_id?: string;
     google_client_id?: string;
     google_client_secret_set?: boolean;
@@ -34,6 +35,7 @@ type FormState = {
   ai_quiet_hours_start: string;
   ai_quiet_hours_end: string;
   ai_max_replies_per_5m: string;
+  ai_reply_cooldown_minutes: string;
   google_calendar_id: string;
   google_client_id: string;
   google_client_secret: string;
@@ -69,6 +71,7 @@ const INITIAL_FORM: FormState = {
   ai_quiet_hours_start: "22:00",
   ai_quiet_hours_end: "08:00",
   ai_max_replies_per_5m: "20",
+  ai_reply_cooldown_minutes: "2",
   google_calendar_id: "",
   google_client_id: "",
   google_client_secret: "",
@@ -142,6 +145,9 @@ export default function SettingsPage() {
         ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
         ai_quiet_hours_end: String(s.ai_quiet_hours_end || "08:00"),
         ai_max_replies_per_5m: String(clampMaxReplies(String(s.ai_max_replies_per_5m ?? "20"))),
+        ai_reply_cooldown_minutes: String(
+          Math.max(0, Math.min(120, Math.floor(Number(s.ai_reply_cooldown_minutes ?? 2) || 2)))
+        ),
         google_calendar_id: String(s.google_calendar_id || ""),
         google_client_id: String(s.google_client_id || ""),
         google_client_secret: "",
@@ -321,6 +327,10 @@ export default function SettingsPage() {
         ai_quiet_hours_start: form.ai_quiet_hours_start,
         ai_quiet_hours_end: form.ai_quiet_hours_end,
         ai_max_replies_per_5m: clampMaxReplies(form.ai_max_replies_per_5m),
+        ai_reply_cooldown_minutes: Math.max(
+          0,
+          Math.min(120, Math.floor(Number(form.ai_reply_cooldown_minutes || "2") || 2))
+        ),
         google_calendar_id: form.google_calendar_id,
         google_client_id: form.google_client_id,
       };
@@ -509,6 +519,21 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
+
+              <label className="block text-sm">
+                <span className="mb-1 block text-gray-700">AI Reply Cooldown (minutes)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={form.ai_reply_cooldown_minutes}
+                  onChange={(e) => onField("ai_reply_cooldown_minutes", e.target.value)}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Prevents immediate back-to-back AI auto replies for the same lead.
+                </p>
+              </label>
 
               <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
                 <div className="mb-3">

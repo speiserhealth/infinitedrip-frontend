@@ -12,6 +12,8 @@ type UserRow = {
   createdAt?: string;
   approval_status?: "pending" | "approved" | "rejected" | string;
   approved_at?: string | null;
+  billing_status?: "trial" | "active" | "past_due" | "canceled" | "none" | string;
+  trial_ends_at?: string | null;
 };
 
 type AdminStatus = {
@@ -61,6 +63,12 @@ type LeadIntegrityResult = {
 };
 
 type Tab = "pending" | "approved" | "rejected";
+type BillingDraft = {
+  billing_status: "trial" | "active" | "past_due" | "canceled" | "none";
+  trial_ends_at: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+};
 
 const TABS: Tab[] = ["pending", "approved", "rejected"];
 
@@ -94,6 +102,7 @@ export default function AdminUsersPage() {
   const [integrityLimit, setIntegrityLimit] = React.useState("5000");
   const [integrityBusy, setIntegrityBusy] = React.useState(false);
   const [integrityResult, setIntegrityResult] = React.useState<LeadIntegrityResult | null>(null);
+  const [billingByUser, setBillingByUser] = React.useState<Record<number, BillingDraft>>({});
 
   async function load(nextTab: Tab = tab) {
     setLoading(true);
@@ -135,7 +144,24 @@ export default function AdminUsersPage() {
       const statusBody = await statusResp.json();
       const invitesBody = await invitesResp.json();
 
-      setUsers(Array.isArray(usersBody?.users) ? usersBody.users : []);
+      const nextUsers = Array.isArray(usersBody?.users) ? usersBody.users : [];
+      setUsers(nextUsers);
+      setBillingByUser((prev) => {
+        const next: Record<number, BillingDraft> = { ...prev };
+        for (const u of nextUsers) {
+          const id = Number(u?.id || 0);
+          if (!id) continue;
+          if (!next[id]) {
+            next[id] = {
+              billing_status: (String(u?.billing_status || "trial").toLowerCase() as BillingDraft["billing_status"]) || "trial",
+              trial_ends_at: String(u?.trial_ends_at || ""),
+              stripe_customer_id: "",
+              stripe_subscription_id: "",
+            };
+          }
+        }
+        return next;
+      });
       setStatus((statusBody?.status || {}) as AdminStatus);
       setInvites(Array.isArray(invitesBody?.invites) ? invitesBody.invites : []);
     } catch (e: any) {
@@ -228,6 +254,51 @@ export default function AdminUsersPage() {
       setError(String(e?.message || "Lead integrity check failed"));
     } finally {
       setIntegrityBusy(false);
+    }
+  }
+
+  function setBillingDraft(id: number, patch: Partial<BillingDraft>) {
+    setBillingByUser((prev) => {
+      const current: BillingDraft = prev[id] || {
+        billing_status: "trial",
+        trial_ends_at: "",
+        stripe_customer_id: "",
+        stripe_subscription_id: "",
+      };
+      return {
+        ...prev,
+        [id]: { ...current, ...patch },
+      };
+    });
+  }
+
+  async function saveBilling(id: number) {
+    const draft = billingByUser[id];
+    if (!draft) return;
+    setBusyId(id);
+    setError("");
+    try {
+      const payload: Record<string, any> = {
+        billing_status: draft.billing_status,
+        trial_ends_at: draft.trial_ends_at ? draft.trial_ends_at : null,
+      };
+      if (draft.stripe_customer_id.trim()) payload.stripe_customer_id = draft.stripe_customer_id.trim();
+      if (draft.stripe_subscription_id.trim()) payload.stripe_subscription_id = draft.stripe_subscription_id.trim();
+
+      const r = await apiFetch(`/api/admin/users/${id}/billing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        throw new Error(`Billing update failed (${r.status}): ${txt}`);
+      }
+      await load(tab);
+    } catch (e: any) {
+      setError(String(e?.message || "Billing update failed"));
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -391,6 +462,12 @@ export default function AdminUsersPage() {
           {users.map((u) => {
             const fullName = [u.first_name, u.last_name].filter(Boolean).join(" ") || "(No name)";
             const busy = busyId === u.id;
+            const draft = billingByUser[u.id] || {
+              billing_status: (String(u?.billing_status || "trial").toLowerCase() as BillingDraft["billing_status"]) || "trial",
+              trial_ends_at: String(u?.trial_ends_at || ""),
+              stripe_customer_id: "",
+              stripe_subscription_id: "",
+            };
             return (
               <div key={u.id} className="rounded border border-gray-200 p-3 flex items-center justify-between gap-3">
                 <div className="text-sm">
@@ -400,6 +477,9 @@ export default function AdminUsersPage() {
                   <div className="text-xs text-gray-500 mt-1">
                     Created: {fmtDate(u.createdAt)}
                     {u.approved_at ? ` | Approved: ${fmtDate(u.approved_at)}` : ""}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    Billing: {String(u.billing_status || "trial")} | Trial ends: {fmtDate(u.trial_ends_at) || "n/a"}
                   </div>
                 </div>
 
@@ -448,6 +528,38 @@ export default function AdminUsersPage() {
                     className="rounded bg-indigo-700 text-white text-sm px-3 py-2 hover:bg-indigo-600 disabled:opacity-60"
                   >
                     Send Reset
+                  </button>
+
+                  <select
+                    value={draft.billing_status}
+                    onChange={(e) =>
+                      setBillingDraft(u.id, {
+                        billing_status: String(e.target.value || "trial") as BillingDraft["billing_status"],
+                      })
+                    }
+                    className="rounded border border-gray-300 px-2 py-2 text-sm"
+                  >
+                    <option value="trial">trial</option>
+                    <option value="active">active</option>
+                    <option value="past_due">past_due</option>
+                    <option value="canceled">canceled</option>
+                    <option value="none">none</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    value={draft.trial_ends_at}
+                    onChange={(e) => setBillingDraft(u.id, { trial_ends_at: e.target.value })}
+                    placeholder="Trial end (YYYY-MM-DD HH:mm:ss)"
+                    className="w-56 rounded border border-gray-300 px-2 py-2 text-sm"
+                  />
+
+                  <button
+                    onClick={() => saveBilling(u.id)}
+                    disabled={busy}
+                    className="rounded bg-slate-800 text-white text-sm px-3 py-2 hover:bg-slate-700 disabled:opacity-60"
+                  >
+                    Save Billing
                   </button>
                 </div>
               </div>
