@@ -10,6 +10,7 @@ type SettingsResponse = {
     user_id?: string;
     textdrip_api_token_set?: boolean;
     textdrip_base_url?: string;
+    textdrip_base_url_effective?: string;
     textdrip_webhook_secret?: string;
     textdrip_webhook_secret_set?: boolean;
     ai_first_reply_mode?: string;
@@ -175,6 +176,7 @@ export default function SettingsPage() {
   const [textdripModalSaving, setTextdripModalSaving] = React.useState(false);
   const [textdripDraft, setTextdripDraft] = React.useState<TextdripConnectDraft>(INITIAL_TEXTDRIP_DRAFT);
   const [textdripAdvancedOpen, setTextdripAdvancedOpen] = React.useState(false);
+  const [textdripBaseUrlEffective, setTextdripBaseUrlEffective] = React.useState("");
 
   const [faqs, setFaqs] = React.useState<AiFaqRow[]>([]);
   const [faqSaving, setFaqSaving] = React.useState(false);
@@ -199,6 +201,7 @@ export default function SettingsPage() {
       const data = (await res.json()) as SettingsResponse;
       const s = data?.settings || {};
       setWebhookUrl(String(data?.webhook_url || ""));
+      setTextdripBaseUrlEffective(String(s.textdrip_base_url_effective || s.textdrip_base_url || ""));
 
       setForm({
         textdrip_api_token: "",
@@ -510,9 +513,6 @@ export default function SettingsPage() {
       const payload: Record<string, unknown> = {
         textdrip_base_url: String(textdripDraft.baseUrl || "").trim(),
       };
-      if (!String(payload.textdrip_base_url || "")) {
-        throw new Error("Textdrip endpoint URL is required.");
-      }
       if (textdripDraft.apiToken.trim()) payload.textdrip_api_token = textdripDraft.apiToken.trim();
       if (textdripDraft.webhookSecret.trim()) payload.textdrip_webhook_secret = textdripDraft.webhookSecret.trim();
 
@@ -693,7 +693,7 @@ export default function SettingsPage() {
               <div className="block text-sm md:col-span-2 rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="font-medium text-gray-800">Connection Snapshot</div>
                 <div className="mt-1 text-xs text-gray-600">
-                  Account details: {tokenSet && form.textdrip_base_url ? "saved" : "incomplete"} | Inbound security key: {webhookSecretSet ? "set" : "not set"}
+                  Account details: {tokenSet ? "saved" : "not set"} | Inbound security key: {webhookSecretSet ? "set" : "not set"}
                 </div>
                 <p className="mt-1 text-xs text-gray-500">Use Connect Textdrip to add or replace details.</p>
               </div>
@@ -1110,7 +1110,7 @@ export default function SettingsPage() {
                 Close
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-500">Only texting is connected here. Two quick steps.</p>
+            <p className="mt-1 text-xs text-gray-500">Only texting is connected here. Most users only need Step 1 and Step 2 below.</p>
 
             <div className="mt-4 grid gap-3">
               <label className="block text-sm">
@@ -1124,18 +1124,11 @@ export default function SettingsPage() {
                 />
                 <p className="mt-1 text-xs text-gray-500">Found in your Textdrip account API settings.</p>
               </label>
-
-              <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Step 1: Endpoint URL</span>
-                <input
-                  type="text"
-                  value={textdripDraft.baseUrl}
-                  onChange={(e) => setTextdripDraft((prev) => ({ ...prev, baseUrl: e.target.value }))}
-                  placeholder="https://api.textdrip.com/..."
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                />
-                <p className="mt-1 text-xs text-gray-500">Usually provided by Textdrip support/docs.</p>
-              </label>
+              <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+                <div className="font-medium text-gray-700">Platform Endpoint</div>
+                <div className="mt-1 break-all">{textdripBaseUrlEffective || "Using backend default endpoint from server env."}</div>
+                <p className="mt-1 text-gray-500">You only need to change this in advanced options if support tells you to.</p>
+              </div>
 
               <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
                 <div className="font-medium text-gray-700">Step 2: Inbound Callback URL</div>
@@ -1168,7 +1161,17 @@ export default function SettingsPage() {
                   {textdripAdvancedOpen ? "Hide advanced options" : "Show advanced options"}
                 </button>
                 {textdripAdvancedOpen ? (
-                  <div className="mt-2">
+                  <div className="mt-2 space-y-3">
+                    <label className="block text-sm">
+                      <span className="mb-1 block text-gray-700">Custom Endpoint URL (optional)</span>
+                      <input
+                        type="text"
+                        value={textdripDraft.baseUrl}
+                        onChange={(e) => setTextdripDraft((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                        placeholder={textdripBaseUrlEffective || "Leave blank to use platform default"}
+                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </label>
                     <label className="block text-sm">
                       <span className="mb-1 block text-gray-700">Inbound Security Key (optional)</span>
                       <input
