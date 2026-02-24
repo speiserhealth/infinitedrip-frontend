@@ -60,7 +60,6 @@ export default function Sidebar() {
     <aside className="flex w-64 flex-col border-r border-border bg-card p-4 text-card-foreground">
       <div className="mb-6">
         <div className="text-xl font-semibold">InfiniteDrip</div>
-        <div className="text-sm text-muted-foreground">AI SMS Appointment Setter</div>
       </div>
 
       <nav className="flex-1 space-y-1">

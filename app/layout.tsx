@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "InfiniteDrip",
-  description: "AI SMS Appointment Setter",
+  description: "InfiniteDrip CRM",
 };
 
 const THEME_INIT_SCRIPT = `
