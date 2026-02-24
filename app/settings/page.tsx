@@ -1110,7 +1110,7 @@ export default function SettingsPage() {
                 Close
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-500">Only texting is connected here. Most users only need Step 1 and Step 2 below.</p>
+            <p className="mt-1 text-xs text-gray-500">Only texting is connected here. Most users only need the two steps below.</p>
 
             <div className="mt-4 grid gap-3">
               <label className="block text-sm">
@@ -1150,6 +1150,9 @@ export default function SettingsPage() {
                     {rotatingSecret ? "Regenerating..." : "Regenerate Security Key"}
                   </button>
                 </div>
+                <p className="mt-2 text-gray-500">
+                  Regenerate Security Key creates a new private inbound key. If you regenerate it, copy this callback URL again in Textdrip.
+                </p>
               </div>
 
               <div className="rounded border border-gray-200 p-3 text-xs">
