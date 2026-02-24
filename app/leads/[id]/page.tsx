@@ -60,11 +60,11 @@ function addMinutesToLocalInput(localValue: string, minutes: number) {
 const STATUSES: LeadStatus[] = ["engaged", "cold", "booked", "sold", "dead"];
 
 const STATUS_STYLE: Record<LeadStatus, string> = {
-  engaged: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  cold: "bg-cyan-100 text-cyan-800 border-cyan-300",
-  booked: "bg-green-100 text-green-800 border-green-300",
-  sold: "bg-indigo-100 text-indigo-800 border-indigo-300",
-  dead: "bg-red-100 text-red-700 border-red-300",
+  engaged: "border-amber-400/40 bg-amber-500/15 text-amber-300",
+  cold: "border-cyan-400/40 bg-cyan-500/15 text-cyan-300",
+  booked: "bg-emerald-500/15 text-emerald-200 border-emerald-400/40",
+  sold: "border-indigo-400/40 bg-indigo-500/15 text-indigo-300",
+  dead: "bg-rose-500/15 text-rose-300 border-rose-400/40",
 };
 
 const EMOJI_CHOICES = ["🙂", "👍", "✅", "📅", "⏰", "🙏", "🎉", "📲"];
@@ -497,15 +497,15 @@ export default function LeadThreadPage() {
   const archived = Number(lead?.archived ?? 0) === 1;
 
   return (
-    <div className="p-4 md:p-6 max-w-[1280px] mx-auto h-[85vh] flex flex-col">
+    <div className="mx-auto flex h-[85vh] max-w-[1280px] flex-col rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-6">
       <div className="mb-3 flex items-center gap-3">
-        <Link href="/leads" className="text-blue-600 underline">
+        <Link href="/leads" className="text-cyan-400 underline decoration-cyan-500/40">
           ← Back
         </Link>
 
-        <div className="text-sm text-gray-500">Lead #{leadId}</div>
+        <div className="text-sm text-muted-foreground">Lead #{leadId}</div>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-rose-400">{error}</div>}
       </div>
 
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -513,12 +513,12 @@ export default function LeadThreadPage() {
           <div className="flex items-center gap-2">
             <div className="text-xl font-semibold leading-tight">{lead?.name || lead?.phone || "Lead"}</div>
             {archived ? (
-              <span className="text-xs px-2 py-0.5 rounded border bg-cyan-100 text-cyan-800 border-cyan-300">
+              <span className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-300">
                 Archived
               </span>
             ) : null}
           </div>
-          <div className="text-sm text-gray-500">{lead?.phone}</div>
+          <div className="text-sm text-muted-foreground">{lead?.phone}</div>
           <div className="mt-2 flex items-center gap-2">
             <input
               type="email"
@@ -544,13 +544,13 @@ export default function LeadThreadPage() {
                 }
                 openGmailCompose();
               }}
-              className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm hover:bg-gray-50"
+              className="rounded border border-border bg-card/70 px-2 py-1.5 text-sm hover:bg-muted/40"
               title="Open Gmail compose"
             >
               Email via Gmail
             </button>
           </div>
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="mt-1 text-xs text-muted-foreground">
             {googleGmailConnected
               ? `Connected Google account: ${googleConnectedEmail || "connected"}`
               : "Tip: Connect Google in Settings to align Gmail + Calendar on one account."}
@@ -559,7 +559,7 @@ export default function LeadThreadPage() {
 
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <div className="text-sm text-gray-600">Status</div>
+            <div className="text-sm text-muted-foreground">Status</div>
             <select
               value={currentStatus}
               onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
@@ -581,14 +581,14 @@ export default function LeadThreadPage() {
               disabled={updatingAi}
               onChange={(e) => handleAiToggle(e.target.checked)}
             />
-            <span className="text-gray-700">AI {aiOn ? "On" : "Off"}</span>
+            <span className="text-muted-foreground">AI {aiOn ? "On" : "Off"}</span>
           </label>
           <button
             type="button"
             onClick={() => handleHotToggle(!hot)}
             disabled={updatingHot}
             className={`rounded border px-2 py-1 text-sm ${
-              hot ? "bg-orange-100 border-orange-300 text-orange-800" : "bg-white border-gray-300 text-gray-600"
+              hot ? "border-orange-400/40 bg-orange-500/15 text-orange-200" : "bg-card/70 border-border text-muted-foreground"
             }`}
             title={hot ? "Unset hot" : "Set hot"}
           >
@@ -599,7 +599,7 @@ export default function LeadThreadPage() {
             onClick={() => handleArchiveToggle(!archived)}
             disabled={updatingArchive}
             className={`rounded border px-2 py-1 text-sm ${
-              archived ? "bg-cyan-100 border-cyan-300 text-cyan-800" : "bg-white border-gray-300 text-gray-600"
+              archived ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-300" : "bg-card/70 border-border text-muted-foreground"
             }`}
             title={archived ? "Unarchive lead" : "Archive lead"}
           >
@@ -610,7 +610,7 @@ export default function LeadThreadPage() {
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-3">
         <aside className="order-2 lg:order-2 min-h-0 overflow-y-auto pr-1 space-y-3">
-          <div className="border rounded-lg p-3 bg-white shadow-sm">
+          <div className="rounded-lg border border-border/70 bg-card/70 p-3 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium">Notes</div>
               <button
@@ -630,11 +630,11 @@ export default function LeadThreadPage() {
             />
           </div>
 
-          <div className="border rounded-lg p-3 bg-white shadow-sm">
+          <div className="rounded-lg border border-border/70 bg-card/70 p-3 shadow-sm">
             <div className="text-sm font-medium mb-2">Book Appointment</div>
             <div className="grid gap-2">
               <label className="text-sm">
-                <span className="mb-1 block text-gray-700">Start</span>
+                <span className="mb-1 block text-muted-foreground">Start</span>
                 <input
                   type="datetime-local"
                   value={bookingStart}
@@ -643,7 +643,7 @@ export default function LeadThreadPage() {
                 />
               </label>
               <label className="text-sm">
-                <span className="mb-1 block text-gray-700">End</span>
+                <span className="mb-1 block text-muted-foreground">End</span>
                 <input
                   type="datetime-local"
                   value={bookingEnd}
@@ -652,7 +652,7 @@ export default function LeadThreadPage() {
                 />
               </label>
               <label className="text-sm">
-                <span className="mb-1 block text-gray-700">Title</span>
+                <span className="mb-1 block text-muted-foreground">Title</span>
                 <input
                   type="text"
                   value={bookingTitle}
@@ -662,7 +662,7 @@ export default function LeadThreadPage() {
                 />
               </label>
               <label className="text-sm">
-                <span className="mb-1 block text-gray-700">Description (optional)</span>
+                <span className="mb-1 block text-muted-foreground">Description (optional)</span>
                 <textarea
                   value={bookingDescription}
                   onChange={(e) => setBookingDescription(e.target.value)}
@@ -676,7 +676,7 @@ export default function LeadThreadPage() {
                 type="button"
                 onClick={handleBookAppointment}
                 disabled={bookingBusy}
-                className="bg-green-600 text-white px-3 py-2 rounded"
+                className="rounded bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-500"
               >
                 {bookingBusy ? "Booking..." : "Book + Mark Booked"}
               </button>
@@ -701,19 +701,19 @@ export default function LeadThreadPage() {
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3 pr-1">
             {filtered.length === 0 ? (
-              <div className="text-gray-500">{q.trim() ? "No matches." : "No messages yet."}</div>
+              <div className="text-muted-foreground">{q.trim() ? "No matches." : "No messages yet."}</div>
             ) : (
               filtered.map((m) => (
                 <div
                   key={m.id}
-                  className={`border rounded-lg p-3 shadow-sm ${m.direction === "out" ? "bg-blue-50 ml-8" : "bg-white mr-8"}`}
+                  className={`border rounded-lg p-3 shadow-sm ${m.direction === "out" ? "bg-cyan-500/10 ml-8" : "bg-card/70 mr-8"}`}
                 >
                   <div className="flex justify-between mb-1 text-xs">
                     <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
-                    <div className="text-gray-500">{formatTime(m.created_at)}</div>
+                    <div className="text-muted-foreground">{formatTime(m.created_at)}</div>
                   </div>
                   {m.direction === "out" && m.delivery_status ? (
-                    <div className="mb-1 text-[11px] text-gray-500">
+                    <div className="mb-1 text-[11px] text-muted-foreground">
                       Delivery: {String(m.delivery_status)}
                       {m.delivery_status_at ? ` (${formatTime(m.delivery_status_at)})` : ""}
                     </div>
@@ -758,8 +758,8 @@ export default function LeadThreadPage() {
               </button>
             </div>
             {mediaUrl ? (
-              <div className="mb-2 rounded border border-gray-200 p-2 flex items-center justify-between gap-3">
-                <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline truncate">
+              <div className="mb-2 rounded border border-border/70 p-2 flex items-center justify-between gap-3">
+                <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-cyan-400 underline truncate">
                   Attached image
                 </a>
                 <button
@@ -773,13 +773,13 @@ export default function LeadThreadPage() {
             ) : null}
 
             {showEmoji ? (
-              <div className="mb-2 rounded border border-gray-200 p-2 flex flex-wrap gap-2 bg-white">
+              <div className="mb-2 rounded border border-border/70 p-2 flex flex-wrap gap-2 bg-card/70">
                 {EMOJI_CHOICES.map((emo) => (
                   <button
                     key={emo}
                     type="button"
                     onClick={() => insertEmoji(emo)}
-                    className="border rounded px-2 py-1 text-lg leading-none hover:bg-gray-50"
+                    className="border rounded px-2 py-1 text-lg leading-none hover:bg-muted/40"
                   >
                     {emo}
                   </button>
@@ -827,7 +827,7 @@ export default function LeadThreadPage() {
                 😊
               </button>
 
-              <button onClick={handleSend} disabled={sending || (!newMessage.trim() && !mediaUrl)} className="bg-blue-600 text-white px-4 py-2 rounded">
+              <button onClick={handleSend} disabled={sending || (!newMessage.trim() && !mediaUrl)} className="bg-cyan-600 text-white px-4 py-2 rounded">
                 {sending ? "..." : "Send"}
               </button>
             </div>

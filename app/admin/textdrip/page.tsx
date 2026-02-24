@@ -180,18 +180,18 @@ export default function AdminTextdripPage() {
   const statusBreakdown = summary?.delivery_events?.by_status || {};
 
   return (
-    <div className="p-6 max-w-[1600px]">
+    <div className="mx-auto max-w-[1600px] rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Textdrip Debug</h1>
         <button
           onClick={() => load()}
-          className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+          className="rounded border border-border px-3 py-2 text-sm hover:bg-muted/40"
         >
           Refresh
         </button>
       </div>
 
-      <div className="mt-3 rounded border border-gray-200 bg-white p-3">
+      <div className="mt-3 rounded border border-border/70 bg-card/70 p-3">
         <div className="grid gap-2 md:grid-cols-4">
           <input
             type="number"
@@ -199,7 +199,7 @@ export default function AdminTextdripPage() {
             max={1000}
             value={limitInput}
             onChange={(e) => setLimitInput(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Limit"
           />
           <input
@@ -208,40 +208,40 @@ export default function AdminTextdripPage() {
             max={24 * 30}
             value={hoursInput}
             onChange={(e) => setHoursInput(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Window hours"
           />
           <input
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Filter user_id"
           />
           <input
             value={phoneFilter}
             onChange={(e) => setPhoneFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Filter phone (+1...)"
           />
           <input
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Delivery status (optional)"
           />
           <input
             value={eventTypeFilter}
             onChange={(e) => setEventTypeFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Event type (optional)"
           />
           <input
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Suppression source (optional)"
           />
-          <div className="flex items-center gap-4 px-1 text-sm text-gray-700">
+          <div className="flex items-center gap-4 px-1 text-sm text-muted-foreground">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -262,75 +262,75 @@ export default function AdminTextdripPage() {
         </div>
       </div>
 
-      {isAdmin === false ? <p className="mt-3 text-sm text-red-600">Admin access required.</p> : null}
-      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      {loading ? <p className="mt-3 text-sm text-gray-600">Loading...</p> : null}
+      {isAdmin === false ? <p className="mt-3 text-sm text-rose-400">Admin access required.</p> : null}
+      {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
+      {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Window</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Window</div>
           <div className="text-lg font-semibold">{summary?.window_hours || 0}h</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Events</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Events</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.total || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Delivered</div>
-          <div className="text-lg font-semibold text-green-700">{Number(summary?.delivery_events?.delivered || 0)}</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Delivered</div>
+          <div className="text-lg font-semibold text-emerald-300">{Number(summary?.delivery_events?.delivered || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Failed</div>
-          <div className="text-lg font-semibold text-red-700">{Number(summary?.delivery_events?.failed || 0)}</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Failed</div>
+          <div className="text-lg font-semibold text-rose-300">{Number(summary?.delivery_events?.failed || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Opt-out</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Opt-out</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.opt_out || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Opt-in</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Opt-in</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.opt_in || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Unique phones</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Unique phones</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.unique_phones || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Active suppressed</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Active suppressed</div>
           <div className="text-lg font-semibold">{Number(summary?.suppressed_contacts?.active || 0)}</div>
         </div>
       </div>
 
       {Object.keys(statusBreakdown).length > 0 ? (
-        <div className="mt-3 rounded border border-gray-200 bg-white p-3">
-          <div className="text-xs font-medium text-gray-600">Status breakdown</div>
+        <div className="mt-3 rounded border border-border/70 bg-card/70 p-3">
+          <div className="text-xs font-medium text-muted-foreground">Status breakdown</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {Object.entries(statusBreakdown).map(([k, v]) => (
-              <span key={k} className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
+              <span key={k} className="rounded border border-border/70 bg-muted/40 px-2 py-1 text-xs">
                 {k}: {v}
               </span>
             ))}
           </div>
-          <div className="mt-2 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-muted-foreground">
             Latest event: {fmtDate(summary?.delivery_events?.latest_event_at || "") || "-"}
           </div>
         </div>
       ) : null}
 
-      <div className="mt-6 rounded border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="mt-6 rounded border border-border/70 bg-card/70">
+        <div className="border-b border-border/70 px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-medium">Recent Delivery Events</h2>
-            <p className="text-xs text-gray-500">{events.length} rows</p>
+            <p className="text-xs text-muted-foreground">{events.length} rows</p>
           </div>
         </div>
         {!loading && events.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-gray-600">No delivery events found.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">No delivery events found.</p>
         ) : null}
         {events.length > 0 ? (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-700">
+              <thead className="bg-muted/40 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">When</th>
                   <th className="px-3 py-2 text-left">User</th>
@@ -345,7 +345,7 @@ export default function AdminTextdripPage() {
               </thead>
               <tbody>
                 {events.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100 align-top">
+                  <tr key={row.id} className="border-t border-border/60 align-top">
                     <td className="px-3 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.user_id || "-"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.event_type || "-"}</td>
@@ -359,7 +359,7 @@ export default function AdminTextdripPage() {
                     {includePayload ? (
                       <td className="px-3 py-2">
                         <details>
-                          <summary className="cursor-pointer text-xs text-blue-700">View</summary>
+                          <summary className="cursor-pointer text-xs text-cyan-300">View</summary>
                           <pre className="mt-1 whitespace-pre-wrap text-xs">
                             {JSON.stringify(row.payload || {}, null, 2)}
                           </pre>
@@ -374,18 +374,18 @@ export default function AdminTextdripPage() {
         ) : null}
       </div>
 
-      <div className="mt-6 rounded border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3">
+      <div className="mt-6 rounded border border-border/70 bg-card/70">
+        <div className="border-b border-border/70 px-4 py-3">
           <h2 className="text-lg font-medium">Suppressed Contacts</h2>
-          <p className="text-xs text-gray-500">{contacts.length} rows</p>
+          <p className="text-xs text-muted-foreground">{contacts.length} rows</p>
         </div>
         {!loading && contacts.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-gray-600">No suppressed contacts found.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">No suppressed contacts found.</p>
         ) : null}
         {contacts.length > 0 ? (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-700">
+              <thead className="bg-muted/40 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Updated</th>
                   <th className="px-3 py-2 text-left">User</th>
@@ -402,7 +402,7 @@ export default function AdminTextdripPage() {
                   const isBusy = busyId === row.id;
                   const isActive = Number(row.active || 0) === 1;
                   return (
-                    <tr key={row.id} className="border-t border-gray-100 align-top">
+                    <tr key={row.id} className="border-t border-border/60 align-top">
                       <td className="px-3 py-2 whitespace-nowrap">{fmtDate(row.updated_at)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{row.user_id || "-"}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{row.phone || "-"}</td>
@@ -410,9 +410,9 @@ export default function AdminTextdripPage() {
                       <td className="px-3 py-2 whitespace-nowrap">{row.source || "-"}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {isActive ? (
-                          <span className="rounded bg-red-100 px-2 py-1 text-xs text-red-700">active</span>
+                          <span className="rounded bg-rose-500/15 px-2 py-1 text-xs text-rose-300">active</span>
                         ) : (
-                          <span className="rounded bg-green-100 px-2 py-1 text-xs text-green-700">inactive</span>
+                          <span className="rounded bg-emerald-500/15 px-2 py-1 text-xs text-emerald-300">inactive</span>
                         )}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
@@ -420,7 +420,7 @@ export default function AdminTextdripPage() {
                           <button
                             disabled={isBusy}
                             onClick={() => setContactActive(row, false)}
-                            className="rounded border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50 disabled:opacity-60"
+                            className="rounded border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-60"
                           >
                             Unsuppress
                           </button>
@@ -428,7 +428,7 @@ export default function AdminTextdripPage() {
                           <button
                             disabled={isBusy}
                             onClick={() => setContactActive(row, true)}
-                            className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+                            className="rounded border border-rose-400/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
                           >
                             Suppress
                           </button>
@@ -436,7 +436,7 @@ export default function AdminTextdripPage() {
                       </td>
                       <td className="px-3 py-2">
                         <details>
-                          <summary className="cursor-pointer text-xs text-blue-700">View</summary>
+                          <summary className="cursor-pointer text-xs text-cyan-300">View</summary>
                           <pre className="mt-1 whitespace-pre-wrap text-xs">
                             {JSON.stringify(row.payload || {}, null, 2)}
                           </pre>

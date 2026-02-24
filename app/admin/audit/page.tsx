@@ -61,26 +61,26 @@ export default function AdminAuditPage() {
   }, []);
 
   return (
-    <div className="p-6 max-w-6xl">
+    <div className="mx-auto max-w-6xl rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Audit Log</h1>
-        <button onClick={() => load()} className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+        <button onClick={() => load()} className="rounded border border-border px-3 py-2 text-sm hover:bg-muted/40">
           Refresh
         </button>
       </div>
       {isAdmin === false ? (
-        <p className="mt-3 text-sm text-red-600">Admin access required.</p>
+        <p className="mt-3 text-sm text-rose-400">Admin access required.</p>
       ) : null}
 
-      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      {loading ? <p className="mt-3 text-sm text-gray-600">Loading...</p> : null}
+      {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
+      {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : null}
 
-      {!loading && logs.length === 0 ? <p className="mt-3 text-sm text-gray-600">No audit events yet.</p> : null}
+      {!loading && logs.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No audit events yet.</p> : null}
 
       {!loading && logs.length > 0 ? (
-        <div className="mt-4 overflow-auto rounded border border-gray-200">
+        <div className="mt-4 overflow-auto rounded border border-border/70">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-700">
+            <thead className="bg-muted/40 text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left">When</th>
                 <th className="px-3 py-2 text-left">Actor</th>
@@ -91,7 +91,7 @@ export default function AdminAuditPage() {
             </thead>
             <tbody>
               {logs.map((l) => (
-                <tr key={l.id} className="border-t border-gray-100 align-top">
+                <tr key={l.id} className="border-t border-border/60 align-top">
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDate(l.created_at)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{l.actor_user_id}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{l.action}</td>

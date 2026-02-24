@@ -616,48 +616,48 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <h1 className="text-2xl font-semibold text-gray-900">User Settings</h1>
-      <p className="mt-1 text-sm text-gray-600">Configure your own Textdrip and Google Calendar connections for this account.</p>
+    <div className="mx-auto max-w-4xl rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
+      <h1 className="text-2xl font-semibold text-foreground">User Settings</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Configure your own Textdrip and Google Calendar connections for this account.</p>
 
       {updatedAt ? (
-        <p className="mt-2 text-xs text-gray-500">Last updated: {formatUpdatedAt(updatedAt)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">Last updated: {formatUpdatedAt(updatedAt)}</p>
       ) : null}
 
-      {error ? <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="mt-4 rounded border border-rose-400/40 bg-rose-500/10 p-3 text-sm text-rose-300">{error}</div> : null}
       {success ? (
-        <div className="mt-4 rounded border border-green-300 bg-green-50 p-3 text-sm text-green-700">{success}</div>
+        <div className="mt-4 rounded border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">{success}</div>
       ) : null}
       {googleStatus === "connected" ? (
-        <div className="mt-4 rounded border border-green-300 bg-green-50 p-3 text-sm text-green-700">
+        <div className="mt-4 rounded border border-emerald-400/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
           Google Calendar connected successfully.
         </div>
       ) : null}
       {googleStatus === "missing_refresh_token" ? (
-        <div className="mt-4 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+        <div className="mt-4 rounded border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-200">
           Google returned no refresh token. Try Connect again and approve all prompts.
         </div>
       ) : null}
       {googleStatus === "invalid_callback" || googleStatus === "error" ? (
-        <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+        <div className="mt-4 rounded border border-rose-400/40 bg-rose-500/10 p-3 text-sm text-rose-300">
           Google connection failed. Please try again.
         </div>
       ) : null}
 
       {loading ? (
-        <div className="mt-6 text-sm text-gray-500">Loading settings...</div>
+        <div className="mt-6 text-sm text-muted-foreground">Loading settings...</div>
       ) : (
         <form className="mt-6 space-y-6" onSubmit={onSave}>
-          <section className="rounded border border-gray-200 bg-white p-4">
-            <h2 className="text-lg font-medium text-gray-900">Textdrip</h2>
-            <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
+          <section className="rounded border border-border/70 bg-card/70 p-4">
+            <h2 className="text-lg font-medium text-foreground">Textdrip</h2>
+            <div className="mt-3 rounded border border-cyan-400/40 bg-cyan-500/10 p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="font-medium text-blue-900">Simple Setup</div>
+                <div className="font-medium text-cyan-100">Simple Setup</div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={openTextdripModal}
-                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500"
+                    className="rounded bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500/100"
                   >
                     Connect Textdrip
                   </button>
@@ -665,13 +665,13 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => onRunTextdripWizard()}
                     disabled={runningTextdripWizard || saving}
-                    className="rounded border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-60"
+                    className="rounded border border-cyan-400/40 bg-card/70 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/15 disabled:opacity-60"
                   >
                     {runningTextdripWizard ? "Checking..." : "Run Health Check"}
                   </button>
                 </div>
               </div>
-              <div className="mt-2 grid gap-1 text-xs text-blue-900 md:grid-cols-3">
+              <div className="mt-2 grid gap-1 text-xs text-cyan-100 md:grid-cols-3">
                 <div className={textdripSetup.textdripConnected ? "font-medium" : ""}>
                   {textdripSetup.textdripConnected ? "OK" : "Pending"} 1) Connection details saved
                 </div>
@@ -682,24 +682,24 @@ export default function SettingsPage() {
                   {textdripSetup.webhookLive ? "OK" : "Pending"} 3) Inbound test text received
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-3 text-xs text-blue-800">
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-cyan-200">
                 {textdripSetup.checkedAt ? <span>Last check: {formatUpdatedAt(textdripSetup.checkedAt)}</span> : null}
                 {checkingTextdrip ? <span>Refreshing setup status...</span> : null}
                 {textdripTemplateSource ? <span>Template endpoint: {textdripTemplateSource}</span> : null}
               </div>
-              <p className="mt-2 text-xs text-blue-800">No calling features are connected here, SMS only.</p>
+              <p className="mt-2 text-xs text-cyan-200">No calling features are connected here, SMS only.</p>
             </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
-              <div className="block text-sm md:col-span-2 rounded border border-gray-200 bg-gray-50 p-3">
-                <div className="font-medium text-gray-800">Connection Snapshot</div>
-                <div className="mt-1 text-xs text-gray-600">
+              <div className="block text-sm md:col-span-2 rounded border border-border/70 bg-muted/40 p-3">
+                <div className="font-medium text-foreground">Connection Snapshot</div>
+                <div className="mt-1 text-xs text-muted-foreground">
                   Account details: {tokenSet ? "saved" : "not set"} | Inbound security key: {webhookSecretSet ? "set" : "not set"}
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Use Connect Textdrip to add or replace details.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Use Connect Textdrip to add or replace details.</p>
               </div>
 
               <div className="block text-sm">
-                <span className="mb-1 block text-gray-700">Max AI Replies (per 5 min)</span>
+                <span className="mb-1 block text-muted-foreground">Max AI Replies (per 5 min)</span>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -707,26 +707,26 @@ export default function SettingsPage() {
                     max={100}
                     value={form.ai_max_replies_per_5m}
                     onChange={(e) => onField("ai_max_replies_per_5m", e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    className="w-full rounded border border-border px-3 py-2 text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => applyMaxRepliesPreset(10)}
-                    className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50"
+                    className="rounded border border-border px-3 py-2 text-xs hover:bg-muted/40"
                   >
                     10
                   </button>
                   <button
                     type="button"
                     onClick={() => applyMaxRepliesPreset(20)}
-                    className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50"
+                    className="rounded border border-border px-3 py-2 text-xs hover:bg-muted/40"
                   >
                     20
                   </button>
                   <button
                     type="button"
                     onClick={() => applyMaxRepliesPreset(40)}
-                    className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50"
+                    className="rounded border border-border px-3 py-2 text-xs hover:bg-muted/40"
                   >
                     40
                   </button>
@@ -734,25 +734,25 @@ export default function SettingsPage() {
               </div>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">AI Reply Cooldown (minutes)</span>
+                <span className="mb-1 block text-muted-foreground">AI Reply Cooldown (minutes)</span>
                 <input
                   type="number"
                   min={0}
                   max={120}
                   value={form.ai_reply_cooldown_minutes}
                   onChange={(e) => onField("ai_reply_cooldown_minutes", e.target.value)}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded border border-border px-3 py-2 text-sm"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Prevents immediate back-to-back AI auto replies for the same lead.
                 </p>
               </label>
 
-              <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
+              <div className="block text-sm md:col-span-2 rounded border border-border/70 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <span className="mb-1 block text-gray-800 font-medium">Auto-text Appointment Reminders</span>
-                    <p className="text-xs text-gray-500">
+                    <span className="mb-1 block text-foreground font-medium">Auto-text Appointment Reminders</span>
+                    <p className="text-xs text-muted-foreground">
                       Send reminder SMS before booked appointments. Choose one, all, or none.
                     </p>
                   </div>
@@ -761,8 +761,8 @@ export default function SettingsPage() {
                     onClick={() => onField("appointment_reminders_enabled", !form.appointment_reminders_enabled)}
                     className={`rounded px-3 py-2 text-sm ${
                       form.appointment_reminders_enabled
-                        ? "bg-gray-900 text-white hover:bg-gray-800"
-                        : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        ? "bg-slate-900 text-white hover:bg-slate-800"
+                        : "border border-border text-muted-foreground hover:bg-muted/40"
                     }`}
                   >
                     {form.appointment_reminders_enabled ? "Enabled" : "Disabled"}
@@ -778,8 +778,8 @@ export default function SettingsPage() {
                         onClick={() => toggleReminderOffset(offset)}
                         className={`rounded border px-3 py-1.5 text-xs ${
                           active
-                            ? "bg-blue-100 border-blue-300 text-blue-800"
-                            : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                            ? "bg-cyan-500/15 border-cyan-400/40 text-cyan-200"
+                            : "bg-card/70 border-border text-muted-foreground hover:bg-muted/40"
                         }`}
                       >
                         {offset === "60" ? "1 hour before" : `${offset} min before`}
@@ -788,13 +788,13 @@ export default function SettingsPage() {
                   })}
                 </div>
                 {form.appointment_reminders_enabled && form.appointment_reminder_offsets.length === 0 ? (
-                  <p className="mt-2 text-xs text-amber-700">Select at least one reminder time.</p>
+                  <p className="mt-2 text-xs text-amber-300">Select at least one reminder time.</p>
                 ) : null}
               </div>
 
-              <div className="block text-sm md:col-span-2 rounded border border-gray-200 p-3">
+              <div className="block text-sm md:col-span-2 rounded border border-border/70 p-3">
                 <div className="mb-3">
-                  <span className="mb-1 block text-gray-800 font-medium">AI First Reply Mode</span>
+                  <span className="mb-1 block text-foreground font-medium">AI First Reply Mode</span>
                   <select
                     value={form.ai_first_reply_mode}
                     onChange={(e) =>
@@ -803,28 +803,28 @@ export default function SettingsPage() {
                         e.target.value === "allow_first_reply" ? "allow_first_reply" : "require_prior_outbound"
                       )
                     }
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    className="w-full rounded border border-border px-3 py-2 text-sm"
                   >
                     <option value="require_prior_outbound">Require prior outbound (safer)</option>
                     <option value="allow_first_reply">Allow AI first reply on brand-new inbound</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Safer default keeps AI from initiating conversations unless your CRM has already texted first.
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <span className="mb-1 block text-gray-800 font-medium">Quiet Hours</span>
-                    <p className="text-xs text-gray-500">AI will not auto-reply during this window.</p>
+                    <span className="mb-1 block text-foreground font-medium">Quiet Hours</span>
+                    <p className="text-xs text-muted-foreground">AI will not auto-reply during this window.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onField("ai_quiet_hours_enabled", !form.ai_quiet_hours_enabled)}
                     className={`rounded px-3 py-2 text-sm ${
                       form.ai_quiet_hours_enabled
-                        ? "bg-gray-900 text-white hover:bg-gray-800"
-                        : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        ? "bg-slate-900 text-white hover:bg-slate-800"
+                        : "border border-border text-muted-foreground hover:bg-muted/40"
                     }`}
                   >
                     {form.ai_quiet_hours_enabled ? "Enabled" : "Disabled"}
@@ -832,39 +832,39 @@ export default function SettingsPage() {
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <label className="block text-sm">
-                    <span className="mb-1 block text-gray-700">Start</span>
+                    <span className="mb-1 block text-muted-foreground">Start</span>
                     <input
                       type="time"
                       value={form.ai_quiet_hours_start}
                       onChange={(e) => onField("ai_quiet_hours_start", e.target.value)}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                      className="w-full rounded border border-border px-3 py-2 text-sm"
                     />
                   </label>
                   <label className="block text-sm">
-                    <span className="mb-1 block text-gray-700">End</span>
+                    <span className="mb-1 block text-muted-foreground">End</span>
                     <input
                       type="time"
                       value={form.ai_quiet_hours_end}
                       onChange={(e) => onField("ai_quiet_hours_end", e.target.value)}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                      className="w-full rounded border border-border px-3 py-2 text-sm"
                     />
                   </label>
                 </div>
               </div>
 
               <div className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-gray-700">Inbound Callback URL</span>
+                <span className="mb-1 block text-muted-foreground">Inbound Callback URL</span>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={webhookUrl}
                     readOnly
-                    className="w-full rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
+                    className="w-full rounded border border-border bg-muted/40 px-3 py-2 text-sm"
                   />
                   <button
                     type="button"
                     onClick={onCopyWebhookUrl}
-                    className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+                    className="rounded border border-border px-3 py-2 text-sm hover:bg-muted/40"
                   >
                     Copy
                   </button>
@@ -872,126 +872,126 @@ export default function SettingsPage() {
                     type="button"
                     onClick={onRotateWebhookSecret}
                     disabled={rotatingSecret}
-                    className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
+                    className="rounded border border-border px-3 py-2 text-sm hover:bg-muted/40 disabled:opacity-60"
                   >
                     {rotatingSecret ? "Regenerating..." : "Regenerate Key"}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Paste this URL into Textdrip inbound callback settings for this account.
                 </p>
               </div>
             </div>
           </section>
 
-          <section className="rounded border border-gray-200 bg-white p-4">
-            <h2 className="text-lg font-medium text-gray-900">Google Account (Calendar + Gmail)</h2>
+          <section className="rounded border border-border/70 bg-card/70 p-4">
+            <h2 className="text-lg font-medium text-foreground">Google Account (Calendar + Gmail)</h2>
             <div className="mt-3">
               <button
                 type="button"
                 onClick={onConnectGoogle}
                 disabled={connectingGoogle}
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500/100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {connectingGoogle ? "Redirecting..." : "Connect Google Account"}
               </button>
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 One connect powers appointment booking plus Gmail compose shortcuts.
               </p>
             </div>
-            <div className="mt-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm">
+            <div className="mt-3 rounded border border-border/70 bg-muted/40 p-3 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <div className="font-medium text-gray-800">Connection Status</div>
+                <div className="font-medium text-foreground">Connection Status</div>
                 <button
                   type="button"
                   onClick={() => loadCalendarStatus().catch((e) => setError(String(e?.message || "Calendar check failed")))}
                   disabled={checkingCalendar}
-                  className="rounded border border-gray-300 px-3 py-1.5 text-xs hover:bg-white disabled:opacity-60"
+                  className="rounded border border-border px-3 py-1.5 text-xs hover:bg-card/70 disabled:opacity-60"
                 >
                   {checkingCalendar ? "Checking..." : "Check"}
                 </button>
               </div>
-              <div className="mt-1 text-xs text-gray-600">
+              <div className="mt-1 text-xs text-muted-foreground">
                 Calendar: {calendarStatus?.connected ? "Connected" : calendarStatus?.configured ? "Configured but not connected" : "Not configured"}
               </div>
-              <div className="mt-1 text-xs text-gray-600">
+              <div className="mt-1 text-xs text-muted-foreground">
                 Gmail: {calendarStatus?.gmail_connected ? "Connected" : "Not connected"}
               </div>
               {calendarStatus?.account_email ? (
-                <div className="mt-1 text-xs text-gray-500">
+                <div className="mt-1 text-xs text-muted-foreground">
                   Connected Google account: {calendarStatus.account_email}
                 </div>
               ) : null}
               {calendarStatus?.warning ? (
-                <div className="mt-1 text-xs text-amber-700">Warning: {calendarStatus.warning}</div>
+                <div className="mt-1 text-xs text-amber-300">Warning: {calendarStatus.warning}</div>
               ) : null}
-              <div className="mt-1 text-xs text-gray-500">
+              <div className="mt-1 text-xs text-muted-foreground">
                 Calendar: {calendarStatus?.calendar_id || form.google_calendar_id || "primary"}
               </div>
               {calendarStatus?.next_event_at ? (
-                <div className="mt-1 text-xs text-gray-500">
+                <div className="mt-1 text-xs text-muted-foreground">
                   Next event: {formatUpdatedAt(String(calendarStatus.next_event_at))}
                 </div>
               ) : null}
               {calendarStatus?.checked_at ? (
-                <div className="mt-1 text-xs text-gray-500">
+                <div className="mt-1 text-xs text-muted-foreground">
                   Last check: {formatUpdatedAt(String(calendarStatus.checked_at))}
                 </div>
               ) : null}
               {calendarStatus?.detail ? (
-                <div className="mt-1 text-xs text-red-600 break-all">{calendarStatus.detail}</div>
+                <div className="mt-1 text-xs text-rose-400 break-all">{calendarStatus.detail}</div>
               ) : null}
             </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Calendar ID</span>
+                <span className="mb-1 block text-muted-foreground">Calendar ID</span>
                 <input
                   type="text"
                   value={form.google_calendar_id}
                   onChange={(e) => onField("google_calendar_id", e.target.value)}
                   placeholder="primary"
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded border border-border px-3 py-2 text-sm"
                 />
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Client ID</span>
+                <span className="mb-1 block text-muted-foreground">Client ID</span>
                 <input
                   type="text"
                   value={form.google_client_id}
                   onChange={(e) => onField("google_client_id", e.target.value)}
                   placeholder="Google OAuth Client ID"
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded border border-border px-3 py-2 text-sm"
                 />
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Client Secret</span>
+                <span className="mb-1 block text-muted-foreground">Client Secret</span>
                 <input
                   type="password"
                   value={form.google_client_secret}
                   onChange={(e) => onField("google_client_secret", e.target.value)}
                   placeholder={googleClientSecretSet ? "Saved (enter to replace)" : "Google OAuth Client Secret"}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded border border-border px-3 py-2 text-sm"
                 />
               </label>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Refresh Token</span>
+                <span className="mb-1 block text-muted-foreground">Refresh Token</span>
                 <input
                   type="password"
                   value={form.google_refresh_token}
                   onChange={(e) => onField("google_refresh_token", e.target.value)}
                   placeholder={googleRefreshTokenSet ? "Saved (enter to replace)" : "Google refresh token"}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded border border-border px-3 py-2 text-sm"
                 />
               </label>
             </div>
           </section>
 
-          <section className="rounded border border-gray-200 bg-white p-4">
-            <h2 className="text-lg font-medium text-gray-900">AI FAQ Guardrails</h2>
-            <p className="mt-1 text-xs text-gray-500">
+          <section className="rounded border border-border/70 bg-card/70 p-4">
+            <h2 className="text-lg font-medium text-foreground">AI FAQ Guardrails</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
               Add approved Q&A so AI uses your preferred responses for common lead questions.
             </p>
 
@@ -1001,7 +1001,7 @@ export default function SettingsPage() {
                 value={newFaqQuestion}
                 onChange={(e) => setNewFaqQuestion(e.target.value)}
                 placeholder="Question"
-                className="rounded border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                className="rounded border border-border px-3 py-2 text-sm md:col-span-2"
               />
               <input
                 type="number"
@@ -1010,13 +1010,13 @@ export default function SettingsPage() {
                 value={newFaqPriority}
                 onChange={(e) => setNewFaqPriority(e.target.value)}
                 placeholder="Priority"
-                className="rounded border border-gray-300 px-3 py-2 text-sm"
+                className="rounded border border-border px-3 py-2 text-sm"
               />
               <button
                 type="button"
                 onClick={() => createFaq().catch((e) => setError(String(e?.message || "FAQ create failed")))}
                 disabled={faqSaving}
-                className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
+                className="rounded bg-cyan-600 px-3 py-2 text-sm text-white hover:bg-cyan-500/100 disabled:opacity-60"
               >
                 {faqSaving ? "Adding..." : "Add FAQ"}
               </button>
@@ -1025,21 +1025,21 @@ export default function SettingsPage() {
                 onChange={(e) => setNewFaqAnswer(e.target.value)}
                 placeholder="Approved answer"
                 rows={3}
-                className="rounded border border-gray-300 px-3 py-2 text-sm md:col-span-4"
+                className="rounded border border-border px-3 py-2 text-sm md:col-span-4"
               />
             </div>
 
             <div className="mt-3 space-y-2">
               {faqs.length === 0 ? (
-                <div className="text-xs text-gray-500">No FAQ guardrails yet.</div>
+                <div className="text-xs text-muted-foreground">No FAQ guardrails yet.</div>
               ) : (
                 faqs.map((row) => {
                   const busy = faqBusyId === row.id;
                   return (
-                    <div key={row.id} className="rounded border border-gray-200 p-3 text-sm">
-                      <div className="font-medium text-gray-900">{row.question}</div>
-                      <div className="mt-1 whitespace-pre-wrap text-gray-700">{row.answer}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    <div key={row.id} className="rounded border border-border/70 p-3 text-sm">
+                      <div className="font-medium text-foreground">{row.question}</div>
+                      <div className="mt-1 whitespace-pre-wrap text-muted-foreground">{row.answer}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span>Priority {row.priority}</span>
                         <span>{row.active ? "Active" : "Disabled"}</span>
                         {row.updated_at ? <span>Updated {formatUpdatedAt(row.updated_at)}</span> : null}
@@ -1049,7 +1049,7 @@ export default function SettingsPage() {
                           type="button"
                           onClick={() => toggleFaqActive(row).catch((e) => setError(String(e?.message || "FAQ update failed")))}
                           disabled={busy}
-                          className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-60"
+                          className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
                         >
                           {row.active ? "Disable" : "Enable"}
                         </button>
@@ -1057,7 +1057,7 @@ export default function SettingsPage() {
                           type="button"
                           onClick={() => editFaq(row).catch((e) => setError(String(e?.message || "FAQ edit failed")))}
                           disabled={busy}
-                          className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-60"
+                          className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
                         >
                           Edit
                         </button>
@@ -1065,7 +1065,7 @@ export default function SettingsPage() {
                           type="button"
                           onClick={() => removeFaq(row).catch((e) => setError(String(e?.message || "FAQ delete failed")))}
                           disabled={busy}
-                          className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+                          className="rounded border border-rose-400/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
                         >
                           Delete
                         </button>
@@ -1080,7 +1080,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving..." : "Save Settings"}
           </button>
@@ -1097,47 +1097,47 @@ export default function SettingsPage() {
               if (!textdripModalSaving) setTextdripModalOpen(false);
             }}
           />
-          <div className="relative z-10 w-full max-w-xl rounded border border-gray-200 bg-white p-4 shadow-xl">
+          <div className="relative z-10 w-full max-w-xl rounded border border-border/70 bg-card/70 p-4 shadow-xl">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-medium text-gray-900">Connect Textdrip SMS</h3>
+              <h3 className="text-lg font-medium text-foreground">Connect Textdrip SMS</h3>
               <button
                 type="button"
                 onClick={() => {
                   if (!textdripModalSaving) setTextdripModalOpen(false);
                 }}
-                className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40"
               >
                 Close
               </button>
             </div>
-            <p className="mt-1 text-xs text-gray-500">Only texting is connected here. Most users only need the two steps below.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Only texting is connected here. Most users only need the two steps below.</p>
 
             <div className="mt-4 grid gap-3">
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-700">Step 1: Access Key</span>
+                <span className="mb-1 block text-muted-foreground">Step 1: Access Key</span>
                 <input
                   type="password"
                   value={textdripDraft.apiToken}
                   onChange={(e) => setTextdripDraft((prev) => ({ ...prev, apiToken: e.target.value }))}
                   placeholder={tokenSet ? "Saved (enter to replace)" : "Paste your Textdrip access key"}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded border border-border px-3 py-2 text-sm"
                 />
-                <p className="mt-1 text-xs text-gray-500">Found in your Textdrip account API settings.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Found in your Textdrip account API settings.</p>
               </label>
-              <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                <div className="font-medium text-gray-700">Platform Endpoint</div>
+              <div className="rounded border border-border/70 bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="font-medium text-muted-foreground">Platform Endpoint</div>
                 <div className="mt-1 break-all">{textdripBaseUrlEffective || "Using backend default endpoint from server env."}</div>
-                <p className="mt-1 text-gray-500">You only need to change this in advanced options if support tells you to.</p>
+                <p className="mt-1 text-muted-foreground">You only need to change this in advanced options if support tells you to.</p>
               </div>
 
-              <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                <div className="font-medium text-gray-700">Step 2: Inbound Callback URL</div>
+              <div className="rounded border border-border/70 bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="font-medium text-muted-foreground">Step 2: Inbound Callback URL</div>
                 <div className="mt-1 break-all">{webhookUrl || "Save credentials first to generate callback URL."}</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={onCopyWebhookUrl}
-                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs hover:bg-gray-50"
+                    className="rounded border border-border bg-card/70 px-2 py-1 text-xs hover:bg-muted/40"
                   >
                     Copy URL
                   </button>
@@ -1145,44 +1145,44 @@ export default function SettingsPage() {
                     type="button"
                     onClick={onRotateWebhookSecret}
                     disabled={rotatingSecret}
-                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-60"
+                    className="rounded border border-border bg-card/70 px-2 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
                   >
                     {rotatingSecret ? "Regenerating..." : "Regenerate Security Key"}
                   </button>
                 </div>
-                <p className="mt-2 text-gray-500">
+                <p className="mt-2 text-muted-foreground">
                   Regenerate Security Key creates a new private inbound key. If you regenerate it, copy this callback URL again in Textdrip.
                 </p>
               </div>
 
-              <div className="rounded border border-gray-200 p-3 text-xs">
+              <div className="rounded border border-border/70 p-3 text-xs">
                 <button
                   type="button"
                   onClick={() => setTextdripAdvancedOpen((v) => !v)}
-                  className="font-medium text-gray-700 underline decoration-dotted underline-offset-4"
+                  className="font-medium text-muted-foreground underline decoration-dotted underline-offset-4"
                 >
                   {textdripAdvancedOpen ? "Hide advanced options" : "Show advanced options"}
                 </button>
                 {textdripAdvancedOpen ? (
                   <div className="mt-2 space-y-3">
                     <label className="block text-sm">
-                      <span className="mb-1 block text-gray-700">Custom Endpoint URL (optional)</span>
+                      <span className="mb-1 block text-muted-foreground">Custom Endpoint URL (optional)</span>
                       <input
                         type="text"
                         value={textdripDraft.baseUrl}
                         onChange={(e) => setTextdripDraft((prev) => ({ ...prev, baseUrl: e.target.value }))}
                         placeholder={textdripBaseUrlEffective || "Leave blank to use platform default"}
-                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        className="w-full rounded border border-border px-3 py-2 text-sm"
                       />
                     </label>
                     <label className="block text-sm">
-                      <span className="mb-1 block text-gray-700">Inbound Security Key (optional)</span>
+                      <span className="mb-1 block text-muted-foreground">Inbound Security Key (optional)</span>
                       <input
                         type="password"
                         value={textdripDraft.webhookSecret}
                         onChange={(e) => setTextdripDraft((prev) => ({ ...prev, webhookSecret: e.target.value }))}
                         placeholder={webhookSecretSet ? "Saved (enter to replace)" : "Optional key"}
-                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        className="w-full rounded border border-border px-3 py-2 text-sm"
                       />
                     </label>
                   </div>
@@ -1195,7 +1195,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => onSaveTextdripConnect(false)}
                 disabled={textdripModalSaving}
-                className="rounded border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50 disabled:opacity-60"
+                className="rounded border border-border px-3 py-2 text-xs hover:bg-muted/40 disabled:opacity-60"
               >
                 {textdripModalSaving ? "Saving..." : "Save Credentials"}
               </button>
@@ -1203,7 +1203,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => onSaveTextdripConnect(true)}
                 disabled={textdripModalSaving}
-                className="rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-60"
+                className="rounded bg-cyan-600 px-3 py-2 text-xs font-medium text-white hover:bg-cyan-500/100 disabled:opacity-60"
               >
                 {textdripModalSaving ? "Running..." : "Save + Run Check"}
               </button>

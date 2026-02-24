@@ -192,18 +192,18 @@ export default function AdminEmailPage() {
   const statusBreakdown = summary?.delivery_events?.by_status || {};
 
   return (
-    <div className="p-6 max-w-[1600px]">
+    <div className="mx-auto max-w-[1600px] rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Email Debug</h1>
         <button
           onClick={() => load()}
-          className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+          className="rounded border border-border px-3 py-2 text-sm hover:bg-muted/40"
         >
           Refresh
         </button>
       </div>
 
-      <div className="mt-3 rounded border border-gray-200 bg-white p-3">
+      <div className="mt-3 rounded border border-border/70 bg-card/70 p-3">
         <div className="grid gap-2 md:grid-cols-4">
           <input
             type="number"
@@ -211,7 +211,7 @@ export default function AdminEmailPage() {
             max={1000}
             value={limitInput}
             onChange={(e) => setLimitInput(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Limit"
           />
           <input
@@ -220,40 +220,40 @@ export default function AdminEmailPage() {
             max={24 * 30}
             value={hoursInput}
             onChange={(e) => setHoursInput(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Window hours"
           />
           <input
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Filter user_id"
           />
           <input
             value={emailFilter}
             onChange={(e) => setEmailFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Filter email"
           />
           <input
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Status (optional)"
           />
           <input
             value={eventTypeFilter}
             onChange={(e) => setEventTypeFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Event type (optional)"
           />
           <input
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm"
+            className="rounded border border-border px-2 py-2 text-sm"
             placeholder="Suppression source (optional)"
           />
-          <div className="flex items-center gap-4 px-1 text-sm text-gray-700">
+          <div className="flex items-center gap-4 px-1 text-sm text-muted-foreground">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -274,21 +274,21 @@ export default function AdminEmailPage() {
         </div>
       </div>
 
-      {isAdmin === false ? <p className="mt-3 text-sm text-red-600">Admin access required.</p> : null}
-      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      {loading ? <p className="mt-3 text-sm text-gray-600">Loading...</p> : null}
+      {isAdmin === false ? <p className="mt-3 text-sm text-rose-400">Admin access required.</p> : null}
+      {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
+      {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : null}
 
-      <div className="mt-3 rounded border border-gray-200 bg-white p-3 text-xs text-gray-700">
+      <div className="mt-3 rounded border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground">
         <div>
           Resend configured:{" "}
-          <span className={config.resend_configured ? "text-green-700 font-medium" : "text-yellow-700 font-medium"}>
+          <span className={config.resend_configured ? "text-emerald-300 font-medium" : "text-amber-300 font-medium"}>
             {config.resend_configured ? "yes" : "no"}
           </span>
           {" | "}From: {config.email_from || "-"}
         </div>
         <div>
           Webhook secret set:{" "}
-          <span className={config.webhook_secret_set ? "text-green-700 font-medium" : "text-yellow-700 font-medium"}>
+          <span className={config.webhook_secret_set ? "text-emerald-300 font-medium" : "text-amber-300 font-medium"}>
             {config.webhook_secret_set ? "yes" : "no"}
           </span>
         </div>
@@ -298,70 +298,70 @@ export default function AdminEmailPage() {
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Window</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Window</div>
           <div className="text-lg font-semibold">{summary?.window_hours || 0}h</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Events</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Events</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.total || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Delivered</div>
-          <div className="text-lg font-semibold text-green-700">{Number(summary?.delivery_events?.delivered || 0)}</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Delivered</div>
+          <div className="text-lg font-semibold text-emerald-300">{Number(summary?.delivery_events?.delivered || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Failed</div>
-          <div className="text-lg font-semibold text-red-700">{Number(summary?.delivery_events?.failed || 0)}</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Failed</div>
+          <div className="text-lg font-semibold text-rose-300">{Number(summary?.delivery_events?.failed || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Opened</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Opened</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.opened || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Clicked</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Clicked</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.clicked || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Complaints</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Complaints</div>
           <div className="text-lg font-semibold">{Number(summary?.delivery_events?.complaints || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-500">Active suppressed</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Active suppressed</div>
           <div className="text-lg font-semibold">{Number(summary?.suppressed_emails?.active || 0)}</div>
         </div>
       </div>
 
       {Object.keys(statusBreakdown).length > 0 ? (
-        <div className="mt-3 rounded border border-gray-200 bg-white p-3">
-          <div className="text-xs font-medium text-gray-600">Status breakdown</div>
+        <div className="mt-3 rounded border border-border/70 bg-card/70 p-3">
+          <div className="text-xs font-medium text-muted-foreground">Status breakdown</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {Object.entries(statusBreakdown).map(([k, v]) => (
-              <span key={k} className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
+              <span key={k} className="rounded border border-border/70 bg-muted/40 px-2 py-1 text-xs">
                 {k}: {v}
               </span>
             ))}
           </div>
-          <div className="mt-2 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-muted-foreground">
             Latest event: {fmtDate(summary?.delivery_events?.latest_event_at || "") || "-"}
           </div>
         </div>
       ) : null}
 
-      <div className="mt-6 rounded border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="mt-6 rounded border border-border/70 bg-card/70">
+        <div className="border-b border-border/70 px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-medium">Recent Email Events</h2>
-            <p className="text-xs text-gray-500">{events.length} rows</p>
+            <p className="text-xs text-muted-foreground">{events.length} rows</p>
           </div>
         </div>
         {!loading && events.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-gray-600">No email events found.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">No email events found.</p>
         ) : null}
         {events.length > 0 ? (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-700">
+              <thead className="bg-muted/40 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">When</th>
                   <th className="px-3 py-2 text-left">User</th>
@@ -377,7 +377,7 @@ export default function AdminEmailPage() {
               </thead>
               <tbody>
                 {events.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100 align-top">
+                  <tr key={row.id} className="border-t border-border/60 align-top">
                     <td className="px-3 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.user_id || "-"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.email || row.to_email || "-"}</td>
@@ -389,7 +389,7 @@ export default function AdminEmailPage() {
                     <td className="px-3 py-2">{row.error_reason || "-"}</td>
                     {includePayload ? (
                       <td className="px-3 py-2 max-w-[420px]">
-                        <pre className="whitespace-pre-wrap break-words text-xs text-gray-700">
+                        <pre className="whitespace-pre-wrap break-words text-xs text-muted-foreground">
                           {JSON.stringify(row.payload || {}, null, 2)}
                         </pre>
                       </td>
@@ -402,20 +402,20 @@ export default function AdminEmailPage() {
         ) : null}
       </div>
 
-      <div className="mt-6 rounded border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="mt-6 rounded border border-border/70 bg-card/70">
+        <div className="border-b border-border/70 px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-medium">Suppressed Emails</h2>
-            <p className="text-xs text-gray-500">{suppressed.length} rows</p>
+            <p className="text-xs text-muted-foreground">{suppressed.length} rows</p>
           </div>
         </div>
         {!loading && suppressed.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-gray-600">No suppressed emails found.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">No suppressed emails found.</p>
         ) : null}
         {suppressed.length > 0 ? (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-700">
+              <thead className="bg-muted/40 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Updated</th>
                   <th className="px-3 py-2 text-left">User</th>
@@ -428,20 +428,20 @@ export default function AdminEmailPage() {
               </thead>
               <tbody>
                 {suppressed.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100">
+                  <tr key={row.id} className="border-t border-border/60">
                     <td className="px-3 py-2 whitespace-nowrap">{fmtDate(row.updated_at)}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.user_id || "-"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.email || "-"}</td>
                     <td className="px-3 py-2">{row.reason || "-"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{row.source || "-"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
-                      {row.active ? <span className="text-red-700">active</span> : <span className="text-green-700">inactive</span>}
+                      {row.active ? <span className="text-rose-300">active</span> : <span className="text-emerald-300">inactive</span>}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <button
                         disabled={busyId === row.id}
                         onClick={() => setSuppressedActive(row, !row.active)}
-                        className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-60"
+                        className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
                       >
                         {row.active ? "Unsuppress" : "Suppress"}
                       </button>

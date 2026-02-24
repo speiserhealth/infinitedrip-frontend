@@ -81,9 +81,9 @@ function fmtDate(v?: string | null) {
 
 function healthClass(status?: string) {
   const s = String(status || "").toLowerCase();
-  if (s === "green") return "border-green-300 bg-green-50 text-green-800";
-  if (s === "red") return "border-red-300 bg-red-50 text-red-800";
-  return "border-yellow-300 bg-yellow-50 text-yellow-800";
+  if (s === "green") return "border-emerald-400/40 bg-emerald-500/10 text-emerald-200";
+  if (s === "red") return "border-rose-400/40 bg-rose-500/10 text-rose-200";
+  return "border-amber-400/40 bg-amber-500/10 text-amber-200";
 }
 
 export default function AdminUsersPage() {
@@ -303,35 +303,35 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl">
+    <div className="mx-auto max-w-6xl rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <h1 className="text-2xl font-semibold">User Management</h1>
       {isAdmin === false ? (
-        <p className="mt-3 text-sm text-red-600">Admin access required.</p>
+        <p className="mt-3 text-sm text-rose-400">Admin access required.</p>
       ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-600">Pending</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Pending</div>
           <div className="text-xl font-semibold">{Number(status.user_counts?.pending || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-600">Approved</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Approved</div>
           <div className="text-xl font-semibold">{Number(status.user_counts?.approved || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-600">Rejected</div>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Rejected</div>
           <div className="text-xl font-semibold">{Number(status.user_counts?.rejected || 0)}</div>
         </div>
-        <div className="rounded border border-gray-200 bg-white p-3 text-sm">
-          <div className="text-gray-600">Email Delivery</div>
-          <div className={status.email_configured ? "text-green-700 font-medium" : "text-yellow-700 font-medium"}>
+        <div className="rounded border border-border/70 bg-card/70 p-3 text-sm">
+          <div className="text-muted-foreground">Email Delivery</div>
+          <div className={status.email_configured ? "text-emerald-300 font-medium" : "text-amber-300 font-medium"}>
             {status.email_configured ? "Configured" : "Not configured"}
           </div>
-          <div className="text-xs text-gray-500">{status.email_from || "Set EMAIL_FROM + RESEND_API_KEY"}</div>
+          <div className="text-xs text-muted-foreground">{status.email_from || "Set EMAIL_FROM + RESEND_API_KEY"}</div>
         </div>
       </div>
 
-      <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+      <div className="mt-4 rounded border border-border/70 bg-card/70 p-4">
         <h2 className="text-lg font-medium">Setup Health</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {(status.setup_checks || []).map((c) => (
@@ -343,9 +343,9 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+      <div className="mt-4 rounded border border-border/70 bg-card/70 p-4">
         <h2 className="text-lg font-medium">Lead Integrity</h2>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           Scans lead status/source/hot/archive consistency. Optional fix mode applies canonical values.
         </p>
         <div className="mt-3 grid gap-2 md:grid-cols-4">
@@ -353,7 +353,7 @@ export default function AdminUsersPage() {
             value={integrityUserId}
             onChange={(e) => setIntegrityUserId(e.target.value)}
             placeholder="Optional user_id scope"
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            className="rounded border border-border px-3 py-2 text-sm"
           />
           <input
             type="number"
@@ -362,12 +362,12 @@ export default function AdminUsersPage() {
             value={integrityLimit}
             onChange={(e) => setIntegrityLimit(e.target.value)}
             placeholder="Scan row limit"
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            className="rounded border border-border px-3 py-2 text-sm"
           />
           <button
             disabled={integrityBusy}
             onClick={() => runLeadIntegrity(false)}
-            className="rounded bg-gray-900 text-white text-sm px-3 py-2 hover:bg-gray-800 disabled:opacity-60"
+            className="rounded bg-slate-900 text-white text-sm px-3 py-2 hover:bg-slate-800 disabled:opacity-60"
           >
             {integrityBusy ? "Running..." : "Scan"}
           </button>
@@ -381,7 +381,7 @@ export default function AdminUsersPage() {
         </div>
 
         {integrityResult ? (
-          <div className="mt-3 rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
+          <div className="mt-3 rounded border border-border/60 bg-muted/40 p-3 text-xs text-muted-foreground">
             <div>
               Scanned: {Number(integrityResult.scanned || 0)} | Affected rows:{" "}
               {Number(integrityResult.affected_rows || 0)} | Fixed rows:{" "}
@@ -389,7 +389,7 @@ export default function AdminUsersPage() {
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {Object.entries(integrityResult.issue_counts || {}).map(([k, v]) => (
-                <span key={k} className="rounded border border-gray-200 bg-white px-2 py-1">
+                <span key={k} className="rounded border border-border/70 bg-card/70 px-2 py-1">
                   {k}: {v}
                 </span>
               ))}
@@ -398,7 +398,7 @@ export default function AdminUsersPage() {
         ) : null}
       </div>
 
-      <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+      <div className="mt-4 rounded border border-border/70 bg-card/70 p-4">
         <h2 className="text-lg font-medium">Create Invite</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-4">
           <input
@@ -406,7 +406,7 @@ export default function AdminUsersPage() {
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             placeholder="Optional invite email"
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            className="rounded border border-border px-3 py-2 text-sm"
           />
           <input
             type="number"
@@ -414,11 +414,11 @@ export default function AdminUsersPage() {
             value={inviteExpiryDays}
             onChange={(e) => setInviteExpiryDays(e.target.value)}
             placeholder="Expiry days"
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
+            className="rounded border border-border px-3 py-2 text-sm"
           />
           <button
             onClick={() => createInvite().catch((e) => setError(String(e?.message || "Create invite failed")))}
-            className="rounded bg-blue-600 text-white text-sm px-3 py-2 hover:bg-blue-500"
+            className="rounded bg-cyan-600 text-white text-sm px-3 py-2 hover:bg-cyan-500"
           >
             Create Invite
           </button>
@@ -427,13 +427,13 @@ export default function AdminUsersPage() {
               if (!inviteUrl) return;
               navigator.clipboard.writeText(inviteUrl).catch(() => {});
             }}
-            className="rounded border border-gray-300 text-sm px-3 py-2 hover:bg-gray-50"
+            className="rounded border border-border text-sm px-3 py-2 hover:bg-muted/40"
           >
             Copy Invite URL
           </button>
         </div>
         {inviteUrl ? (
-          <div className="mt-2 text-xs text-gray-600 break-all">{inviteUrl}</div>
+          <div className="mt-2 text-xs text-muted-foreground break-all">{inviteUrl}</div>
         ) : null}
       </div>
 
@@ -444,7 +444,7 @@ export default function AdminUsersPage() {
             onClick={() => setTab(t)}
             className={[
               "rounded px-3 py-2 text-sm border",
-              tab === t ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50",
+              tab === t ? "bg-slate-900 text-white border-slate-900" : "bg-card/70 text-muted-foreground border-border hover:bg-muted/40",
             ].join(" ")}
           >
             {t[0].toUpperCase() + t.slice(1)}
@@ -452,10 +452,10 @@ export default function AdminUsersPage() {
         ))}
       </div>
 
-      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      {loading ? <p className="mt-3 text-sm text-gray-600">Loading...</p> : null}
+      {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
+      {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading...</p> : null}
 
-      {!loading && users.length === 0 ? <p className="mt-3 text-sm text-gray-600">No users in this tab.</p> : null}
+      {!loading && users.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No users in this tab.</p> : null}
 
       {!loading && users.length > 0 ? (
         <div className="mt-4 space-y-2">
@@ -469,16 +469,16 @@ export default function AdminUsersPage() {
               stripe_subscription_id: "",
             };
             return (
-              <div key={u.id} className="rounded border border-gray-200 p-3 flex items-center justify-between gap-3">
+              <div key={u.id} className="rounded border border-border/70 p-3 flex items-center justify-between gap-3">
                 <div className="text-sm">
                   <div className="font-medium">{fullName}</div>
-                  <div className="text-gray-600">{u.email}</div>
-                  <div className="text-gray-500">{u.phone || "No phone"}</div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-muted-foreground">{u.email}</div>
+                  <div className="text-muted-foreground">{u.phone || "No phone"}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
                     Created: {fmtDate(u.createdAt)}
                     {u.approved_at ? ` | Approved: ${fmtDate(u.approved_at)}` : ""}
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-muted-foreground">
                     Billing: {String(u.billing_status || "trial")} | Trial ends: {fmtDate(u.trial_ends_at) || "n/a"}
                   </div>
                 </div>
@@ -488,7 +488,7 @@ export default function AdminUsersPage() {
                     <button
                       onClick={() => runAction(u.id, "approve").catch((e) => setError(String(e?.message || "Approve failed")))}
                       disabled={busy}
-                      className="rounded bg-green-600 text-white text-sm px-3 py-2 hover:bg-green-500 disabled:opacity-60"
+                      className="rounded bg-green-600 text-white text-sm px-3 py-2 hover:bg-emerald-500 disabled:opacity-60"
                     >
                       Approve
                     </button>
@@ -498,7 +498,7 @@ export default function AdminUsersPage() {
                     <button
                       onClick={() => runAction(u.id, "reject").catch((e) => setError(String(e?.message || "Reject failed")))}
                       disabled={busy}
-                      className="rounded bg-yellow-600 text-white text-sm px-3 py-2 hover:bg-yellow-500 disabled:opacity-60"
+                      className="rounded bg-yellow-600 text-white text-sm px-3 py-2 hover:bg-amber-500 disabled:opacity-60"
                     >
                       Reject
                     </button>
@@ -508,7 +508,7 @@ export default function AdminUsersPage() {
                     <button
                       onClick={() => runAction(u.id, "delete").catch((e) => setError(String(e?.message || "Delete failed")))}
                       disabled={busy}
-                      className="rounded bg-red-600 text-white text-sm px-3 py-2 hover:bg-red-500 disabled:opacity-60"
+                      className="rounded bg-red-600 text-white text-sm px-3 py-2 hover:bg-rose-500 disabled:opacity-60"
                     >
                       Delete
                     </button>
@@ -517,7 +517,7 @@ export default function AdminUsersPage() {
                   <button
                     onClick={() => runAction(u.id, "resend-approval-email").catch((e) => setError(String(e?.message || "Resend failed")))}
                     disabled={busy}
-                    className="rounded bg-gray-700 text-white text-sm px-3 py-2 hover:bg-gray-600 disabled:opacity-60"
+                    className="rounded bg-slate-700 text-white text-sm px-3 py-2 hover:bg-slate-600 disabled:opacity-60"
                   >
                     Resend Approval
                   </button>
@@ -537,7 +537,7 @@ export default function AdminUsersPage() {
                         billing_status: String(e.target.value || "trial") as BillingDraft["billing_status"],
                       })
                     }
-                    className="rounded border border-gray-300 px-2 py-2 text-sm"
+                    className="rounded border border-border px-2 py-2 text-sm"
                   >
                     <option value="trial">trial</option>
                     <option value="active">active</option>
@@ -551,7 +551,7 @@ export default function AdminUsersPage() {
                     value={draft.trial_ends_at}
                     onChange={(e) => setBillingDraft(u.id, { trial_ends_at: e.target.value })}
                     placeholder="Trial end (YYYY-MM-DD HH:mm:ss)"
-                    className="w-56 rounded border border-gray-300 px-2 py-2 text-sm"
+                    className="w-56 rounded border border-border px-2 py-2 text-sm"
                   />
 
                   <button
@@ -569,11 +569,11 @@ export default function AdminUsersPage() {
       ) : null}
 
       {!loading && invites.length > 0 ? (
-        <div className="mt-6 rounded border border-gray-200 bg-white p-4">
+        <div className="mt-6 rounded border border-border/70 bg-card/70 p-4">
           <h2 className="text-lg font-medium">Recent Invites</h2>
           <div className="mt-2 space-y-2">
             {invites.map((inv) => (
-              <div key={inv.id} className="text-xs text-gray-700 border border-gray-100 rounded p-2">
+              <div key={inv.id} className="text-xs text-muted-foreground border border-border/60 rounded p-2">
                 <div>ID {inv.id} | role {inv.role || "agent"} | email {inv.email || "(any)"} | status {inv.status || "unknown"}</div>
                 <div>
                   Created: {fmtDate(inv.created_at)} | Expires: {fmtDate(inv.expires_at)} | Revoked: {inv.revoked_at ? fmtDate(inv.revoked_at) : "no"} | Used: {inv.used_at ? fmtDate(inv.used_at) : "no"}
@@ -581,7 +581,7 @@ export default function AdminUsersPage() {
                 {!inv.used_at && !inv.revoked_at ? (
                   <button
                     onClick={() => revokeInvite(inv.id).catch((e) => setError(String(e?.message || "Revoke invite failed")))}
-                    className="mt-2 rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                    className="mt-2 rounded border border-rose-400/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
                   >
                     Revoke
                   </button>

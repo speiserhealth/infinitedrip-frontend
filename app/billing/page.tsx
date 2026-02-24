@@ -50,37 +50,37 @@ export default function BillingPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Billing</h1>
-      <p className="mt-1 text-sm text-gray-600">Billing foundation is active. Stripe checkout wiring can be connected next.</p>
+    <div className="mx-auto max-w-2xl rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
+      <h1 className="text-2xl font-semibold text-foreground">Billing</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Billing foundation is active. Stripe checkout wiring can be connected next.</p>
 
-      {error ? <div className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="mt-4 rounded border border-rose-400/40 bg-rose-500/15 p-3 text-sm text-rose-300">{error}</div> : null}
 
-      <div className="mt-4 rounded border border-gray-200 bg-white p-4 text-sm">
+      <div className="mt-4 rounded-xl border border-border/80 bg-card/70 p-4 text-sm">
         {loading ? (
-          <div className="text-gray-500">Loading billing status...</div>
+          <div className="text-muted-foreground">Loading billing status...</div>
         ) : (
           <div className="space-y-2">
             <div>
-              <span className="text-gray-500">Status:</span> <span className="font-medium text-gray-900">{billing.status || "trial"}</span>
+              <span className="text-muted-foreground">Status:</span> <span className="font-medium text-foreground">{billing.status || "trial"}</span>
             </div>
             <div>
-              <span className="text-gray-500">Trial ends:</span> <span className="text-gray-900">{fmtDate(billing.trial_ends_at)}</span>
+              <span className="text-muted-foreground">Trial ends:</span> <span className="text-foreground">{fmtDate(billing.trial_ends_at)}</span>
             </div>
             <div>
-              <span className="text-gray-500">Stripe customer ID:</span>{" "}
-              <span className="text-gray-900">{billing.stripe_customer_id_set ? "Set" : "Not set"}</span>
+              <span className="text-muted-foreground">Stripe customer ID:</span>{" "}
+              <span className="text-foreground">{billing.stripe_customer_id_set ? "Set" : "Not set"}</span>
             </div>
             <div>
-              <span className="text-gray-500">Stripe subscription ID:</span>{" "}
-              <span className="text-gray-900">{billing.stripe_subscription_id_set ? "Set" : "Not set"}</span>
+              <span className="text-muted-foreground">Stripe subscription ID:</span>{" "}
+              <span className="text-foreground">{billing.stripe_subscription_id_set ? "Set" : "Not set"}</span>
             </div>
             <div>
-              <span className="text-gray-500">Billing enforcement:</span>{" "}
-              <span className="text-gray-900">{billing.enforced ? "Enabled" : "Disabled"}</span>
+              <span className="text-muted-foreground">Billing enforcement:</span>{" "}
+              <span className="text-foreground">{billing.enforced ? "Enabled" : "Disabled"}</span>
             </div>
             <div>
-              <span className="text-gray-500">Last updated:</span> <span className="text-gray-900">{fmtDate(billing.updated_at)}</span>
+              <span className="text-muted-foreground">Last updated:</span> <span className="text-foreground">{fmtDate(billing.updated_at)}</span>
             </div>
           </div>
         )}

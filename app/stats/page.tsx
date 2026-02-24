@@ -156,62 +156,62 @@ export default function StatsPage() {
   }, [leads]);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h1 className="text-2xl font-semibold">Stats</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Stats</h1>
         <div className="flex items-center gap-3 text-sm">
-          <Link className="text-blue-600 underline" href="/dashboard">Dashboard</Link>
-          <Link className="text-blue-600 underline" href="/leads">Leads</Link>
-          <Link className="text-blue-600 underline" href="/pipeline">Funnel</Link>
+          <Link className="text-cyan-400 underline decoration-cyan-500/40" href="/dashboard">Dashboard</Link>
+          <Link className="text-cyan-400 underline decoration-cyan-500/40" href="/leads">Leads</Link>
+          <Link className="text-cyan-400 underline decoration-cyan-500/40" href="/pipeline">Funnel</Link>
         </div>
       </div>
 
-      {error ? <div className="mb-3 text-sm text-red-600">{error}</div> : null}
+      {error ? <div className="mb-3 text-sm text-rose-400">{error}</div> : null}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm text-gray-500">Total leads</div>
-          <div className="text-2xl font-semibold">{overall.total}</div>
+        <div className="rounded-xl border border-border/80 bg-card/70 p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">Total leads</div>
+          <div className="text-2xl font-semibold text-foreground">{overall.total}</div>
         </div>
 
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm text-gray-500">Waiting (client last msg)</div>
-          <div className="text-2xl font-semibold">{overall.waiting}</div>
+        <div className="rounded-xl border border-border/80 bg-card/70 p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">Waiting (client last msg)</div>
+          <div className="text-2xl font-semibold text-foreground">{overall.waiting}</div>
         </div>
 
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm text-gray-500">Hot (3+ inbound msgs)</div>
-          <div className="text-2xl font-semibold">{overall.hot}</div>
+        <div className="rounded-xl border border-border/80 bg-card/70 p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">Hot (3+ inbound msgs)</div>
+          <div className="text-2xl font-semibold text-foreground">{overall.hot}</div>
         </div>
 
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm text-gray-500">Booked</div>
-          <div className="text-2xl font-semibold">{overall.booked}</div>
+        <div className="rounded-xl border border-border/80 bg-card/70 p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">Booked</div>
+          <div className="text-2xl font-semibold text-foreground">{overall.booked}</div>
         </div>
 
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm text-gray-500">Sold</div>
-          <div className="text-2xl font-semibold">{overall.sold}</div>
+        <div className="rounded-xl border border-border/80 bg-card/70 p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">Sold</div>
+          <div className="text-2xl font-semibold text-foreground">{overall.sold}</div>
         </div>
 
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
-          <div className="text-sm text-gray-500">First response time (from first inbound → first outbound)</div>
-          <div className="text-sm text-gray-500 mt-1">Samples: {overall.samples}</div>
-          <div className="mt-2 text-sm">
+        <div className="rounded-xl border border-border/80 bg-card/70 p-4 shadow-sm">
+          <div className="text-sm text-muted-foreground">First response time (from first inbound to first outbound)</div>
+          <div className="mt-1 text-sm text-muted-foreground">Samples: {overall.samples}</div>
+          <div className="mt-2 text-sm text-foreground">
             Avg: <span className="font-semibold">{fmtDuration(overall.avgRt)}</span>
           </div>
-          <div className="text-sm">
+          <div className="text-sm text-foreground">
             Median: <span className="font-semibold">{fmtDuration(overall.medRt)}</span>
           </div>
         </div>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b font-medium">By Source</div>
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card/70 shadow-sm">
+        <div className="border-b border-border/70 px-4 py-3 font-medium text-foreground">By Source</div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+            <thead className="bg-muted/40 text-muted-foreground">
               <tr>
                 <th className="text-left px-4 py-2">Source</th>
                 <th className="text-right px-4 py-2">Leads</th>
@@ -243,7 +243,7 @@ export default function StatsPage() {
                   const m = median(rts);
 
                   return (
-                    <tr key={source} className="border-t">
+                    <tr key={source} className="border-t border-border/70">
                       <td className="px-4 py-2">{srcLabel(source)}</td>
                       <td className="px-4 py-2 text-right">{list.length}</td>
                       <td className="px-4 py-2 text-right">
@@ -266,7 +266,7 @@ export default function StatsPage() {
 
               {bySource.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-gray-500" colSpan={8}>
+                  <td className="px-4 py-6 text-muted-foreground" colSpan={8}>
                     No data yet.
                   </td>
                 </tr>
