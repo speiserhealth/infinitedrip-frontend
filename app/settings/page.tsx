@@ -614,6 +614,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           message: text,
           thread: payloadThread,
+          allow_quote: !!form.ai_allow_quote,
         }),
       });
       if (!res.ok) {
@@ -1574,6 +1575,9 @@ export default function SettingsPage() {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Test AI replies safely here. No SMS is sent from this console.
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Quote mode for this test: {form.ai_allow_quote ? "Enabled" : "Disabled"}.
             </p>
 
             <div className="mt-3 h-72 overflow-y-auto rounded border border-border/70 bg-muted/30 p-3">
