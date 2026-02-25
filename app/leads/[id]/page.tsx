@@ -73,6 +73,7 @@ const STATUS_STYLE: Record<LeadStatus, string> = {
 };
 
 const EMOJI_CHOICES = ["🙂", "👍", "✅", "📅", "⏰", "🙏", "🎉", "📲"];
+const HISTORY_SYNC_INTERVAL_MS = 60 * 1000;
 
 function normalizeStatus(s: any): LeadStatus {
   const v = String(s || "engaged").toLowerCase();
@@ -141,6 +142,7 @@ export default function LeadThreadPage() {
 
   const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const lastHistorySyncAtRef = React.useRef(0);
 
   async function loadTemplates() {
     const r = await apiFetch(`${API_BASE}/api/textdrip/templates`, { cache: "no-store" });
@@ -150,7 +152,7 @@ export default function LeadThreadPage() {
     setTemplates(list);
   }
 
-  async function loadThread() {
+  async function loadThread({ syncHistory = false }: { syncHistory?: boolean } = {}) {
     if (!leadId) return;
 
     const lr = await apiFetch(`${API_BASE}/api/leads?include_archived=1`, { cache: "no-store" });
@@ -164,14 +166,17 @@ export default function LeadThreadPage() {
       setNotesDraft((prev) => (prev === "" ? found.notes || "" : prev));
     }
 
-    const mr = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages`, { cache: "no-store" });
+    const query = syncHistory ? "?sync=1" : "";
+    const mr = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages${query}`, { cache: "no-store" });
     const mdata = await mr.json();
     const msgs: Msg[] = Array.isArray(mdata) ? mdata : mdata?.messages ?? [];
     setMessages(msgs);
+    if (syncHistory) lastHistorySyncAtRef.current = Date.now();
   }
 
   React.useEffect(() => {
     if (!leadId) return;
+    lastHistorySyncAtRef.current = 0;
     try {
       const stored = window.localStorage.getItem(`lead_email_${String(leadId)}`) || "";
       const normalized = normalizeEmail(stored);
@@ -182,7 +187,10 @@ export default function LeadThreadPage() {
 
     async function tick() {
       try {
-        await loadThread();
+        const shouldSyncHistory =
+          lastHistorySyncAtRef.current === 0 ||
+          (Date.now() - lastHistorySyncAtRef.current) >= HISTORY_SYNC_INTERVAL_MS;
+        await loadThread({ syncHistory: shouldSyncHistory });
         if (!dead) setError("");
       } catch {
         if (!dead) setError("Load failed");
