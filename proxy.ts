@@ -12,6 +12,7 @@ const PUBLIC_PATHS = new Set([
 function isAlwaysPublicPath(pathname: string) {
   if (pathname.startsWith("/api/auth")) return true;
   if (pathname.startsWith("/_next")) return true;
+  if (/\.[A-Za-z0-9]+$/.test(pathname)) return true;
   if (pathname === "/favicon.ico") return true;
   if (pathname === "/robots.txt") return true;
   if (pathname === "/sitemap.xml") return true;
