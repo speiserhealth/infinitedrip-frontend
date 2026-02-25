@@ -1234,8 +1234,8 @@ export default function SettingsPage() {
                 onClick={() => onField("ai_allow_quote", !form.ai_allow_quote)}
                 className={`rounded px-3 py-2 text-sm ${
                   form.ai_allow_quote
-                    ? "bg-slate-900 text-white hover:bg-slate-800"
-                    : "border border-border text-muted-foreground hover:bg-muted/40"
+                    ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                    : "border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
                 }`}
               >
                 {form.ai_allow_quote ? "Enabled" : "Disabled"}
