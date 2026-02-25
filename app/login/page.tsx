@@ -75,7 +75,7 @@ export default function LoginPage() {
         <div className="absolute bottom-10 right-0 h-80 w-80 rounded-full bg-sky-700/20 blur-3xl" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-4 py-10">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl -translate-y-4 flex-col items-center justify-center gap-8 px-4 py-10 md:-translate-y-8 lg:-translate-y-10">
         <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-cyan-300/30 shadow-[0_0_36px_rgba(56,189,248,0.18)]">
           <Image
             src="/infinity-login.png"
