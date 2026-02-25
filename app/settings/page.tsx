@@ -1611,6 +1611,14 @@ export default function SettingsPage() {
                 placeholder="Type a lead message to test..."
                 rows={3}
                 className="w-full rounded border border-border px-3 py-2 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!aiTestBusy && String(aiTestInput || "").trim()) {
+                      runAiTestSend().catch((err) => setError(String(err?.message || "AI test failed")));
+                    }
+                  }
+                }}
               />
               <div className="flex flex-wrap justify-between gap-2">
                 <button

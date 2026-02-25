@@ -805,14 +805,17 @@ export default function LeadThreadPage() {
             ) : null}
 
             <div className="flex gap-2">
-              <input
-                type="text"
+              <textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder={mediaUrl ? "Optional caption..." : "Type a message..."}
-                className="flex-1 border rounded px-3 py-2"
+                rows={2}
+                className="flex-1 border rounded px-3 py-2 resize-y"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSend();
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!sending) handleSend();
+                  }
                 }}
               />
 
