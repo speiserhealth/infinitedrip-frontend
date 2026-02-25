@@ -1023,26 +1023,6 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                <div className="mb-3 flex items-center justify-between gap-3 rounded border border-border/70 bg-muted/30 p-3">
-                  <div>
-                    <span className="mb-1 block text-foreground font-medium">Allow AI to Quote</span>
-                    <p className="text-xs text-muted-foreground">
-                      When enabled, AI can give age-chart based quote ranges from your configured quote rules.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onField("ai_allow_quote", !form.ai_allow_quote)}
-                    className={`rounded px-3 py-2 text-sm ${
-                      form.ai_allow_quote
-                        ? "bg-slate-900 text-white hover:bg-slate-800"
-                        : "border border-border text-muted-foreground hover:bg-muted/40"
-                    }`}
-                  >
-                    {form.ai_allow_quote ? "Enabled" : "Disabled"}
-                  </button>
-                </div>
-
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <span className="mb-1 block text-foreground font-medium">Quiet Hours</span>
@@ -1233,6 +1213,26 @@ export default function SettingsPage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Add approved Q&A so AI uses your preferred responses for common lead questions.
             </p>
+
+            <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border/70 bg-muted/30 p-3">
+              <div>
+                <span className="mb-1 block text-foreground font-medium">Allow AI to Quote</span>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, AI can give age-chart based quote ranges from your configured quote rules.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onField("ai_allow_quote", !form.ai_allow_quote)}
+                className={`rounded px-3 py-2 text-sm ${
+                  form.ai_allow_quote
+                    ? "bg-slate-900 text-white hover:bg-slate-800"
+                    : "border border-border text-muted-foreground hover:bg-muted/40"
+                }`}
+              >
+                {form.ai_allow_quote ? "Enabled" : "Disabled"}
+              </button>
+            </div>
 
             <div className="mt-3 grid gap-2 md:grid-cols-4">
               <input
