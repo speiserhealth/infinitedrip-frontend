@@ -14,6 +14,7 @@ type SettingsResponse = {
     textdrip_webhook_secret?: string;
     textdrip_webhook_secret_set?: boolean;
     ai_first_reply_mode?: string;
+    ai_name?: string;
     ai_allow_quote?: boolean;
     ai_quiet_hours_enabled?: boolean;
     ai_quiet_hours_start?: string;
@@ -37,6 +38,7 @@ type FormState = {
   textdrip_base_url: string;
   textdrip_webhook_secret: string;
   ai_first_reply_mode: "require_prior_outbound" | "allow_first_reply";
+  ai_name: string;
   ai_allow_quote: boolean;
   ai_quiet_hours_enabled: boolean;
   ai_quiet_hours_start: string;
@@ -112,6 +114,7 @@ const INITIAL_FORM: FormState = {
   textdrip_base_url: "",
   textdrip_webhook_secret: "",
   ai_first_reply_mode: "require_prior_outbound",
+  ai_name: "",
   ai_allow_quote: false,
   ai_quiet_hours_enabled: false,
   ai_quiet_hours_start: "22:00",
@@ -213,6 +216,7 @@ export default function SettingsPage() {
   const [aiTestInput, setAiTestInput] = React.useState("");
   const [aiTestBusy, setAiTestBusy] = React.useState(false);
   const [aiTestThread, setAiTestThread] = React.useState<AiTestMsg[]>([]);
+  const aiTestScrollRef = React.useRef<HTMLDivElement | null>(null);
 
   const [form, setForm] = React.useState<FormState>(INITIAL_FORM);
   const [googleStatus, setGoogleStatus] = React.useState("");
@@ -240,6 +244,7 @@ export default function SettingsPage() {
           String(s.ai_first_reply_mode || "").trim().toLowerCase() === "allow_first_reply"
             ? "allow_first_reply"
             : "require_prior_outbound",
+        ai_name: String(s.ai_name || ""),
         ai_allow_quote: !!s.ai_allow_quote,
         ai_quiet_hours_enabled: !!s.ai_quiet_hours_enabled,
         ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
@@ -312,6 +317,13 @@ export default function SettingsPage() {
       window.scrollTo({ top: 0, behavior: "auto" });
     });
   }, [textdripModalOpen, aiTestOpen]);
+
+  React.useEffect(() => {
+    if (!aiTestOpen) return;
+    const el = aiTestScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [aiTestOpen, aiTestThread.length]);
 
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -650,6 +662,7 @@ export default function SettingsPage() {
     const payload: Record<string, unknown> = {
       textdrip_base_url: form.textdrip_base_url,
       ai_first_reply_mode: form.ai_first_reply_mode,
+      ai_name: String(form.ai_name || "").trim(),
       ai_allow_quote: !!form.ai_allow_quote,
       ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
       ai_quiet_hours_start: form.ai_quiet_hours_start,
@@ -1223,6 +1236,21 @@ export default function SettingsPage() {
               Add approved Q&A so AI uses your preferred responses for common lead questions.
             </p>
 
+            <label className="mt-3 block text-sm">
+              <span className="mb-1 block text-muted-foreground">Your AI&apos;s Name</span>
+              <input
+                type="text"
+                value={form.ai_name}
+                onChange={(e) => onField("ai_name", e.target.value)}
+                placeholder="Example: Allison"
+                maxLength={40}
+                className="w-full rounded border border-border px-3 py-2 text-sm"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Used when a lead asks who they are speaking with.
+              </span>
+            </label>
+
             <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border/70 bg-muted/30 p-3">
               <div>
                 <span className="mb-1 block text-foreground font-medium">Allow AI to Quote</span>
@@ -1580,7 +1608,7 @@ export default function SettingsPage() {
               Quote mode for this test: {form.ai_allow_quote ? "Enabled" : "Disabled"}.
             </p>
 
-            <div className="mt-3 h-72 overflow-y-auto rounded border border-border/70 bg-muted/30 p-3">
+            <div ref={aiTestScrollRef} className="mt-3 h-72 overflow-y-auto rounded border border-border/70 bg-muted/30 p-3">
               {aiTestThread.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Start typing to test how AI will respond.</p>
               ) : (

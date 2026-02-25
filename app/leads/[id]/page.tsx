@@ -137,7 +137,7 @@ export default function LeadThreadPage() {
   const [bookingDescription, setBookingDescription] = React.useState("");
   const [bookingBusy, setBookingBusy] = React.useState(false);
 
-  const bottomRef = React.useRef<HTMLDivElement | null>(null);
+  const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   async function loadTemplates() {
@@ -225,9 +225,10 @@ export default function LeadThreadPage() {
   }, [API_BASE]);
 
   React.useEffect(() => {
-    if (q.trim()) return;
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, q]);
+    const el = threadScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages.length, leadId]);
 
   function insertEmoji(value: string) {
     setNewMessage((prev) => `${prev}${value}`);
@@ -716,7 +717,7 @@ export default function LeadThreadPage() {
             ) : null}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3 pr-1">
+          <div ref={threadScrollRef} className="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3 pr-1">
             {filtered.length === 0 ? (
               <div className="text-muted-foreground">{q.trim() ? "No matches." : "No messages yet."}</div>
             ) : (
@@ -739,8 +740,6 @@ export default function LeadThreadPage() {
                 </div>
               ))
             )}
-
-            <div ref={bottomRef} />
           </div>
 
           <div className="border-t pt-3">
