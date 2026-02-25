@@ -75,7 +75,7 @@ export default function LoginPage() {
         <div className="absolute bottom-10 right-0 h-80 w-80 rounded-full bg-sky-700/20 blur-3xl" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl -translate-y-24 flex-col items-center justify-center gap-8 px-4 py-10 md:-translate-y-32 lg:-translate-y-36">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl -translate-y-16 flex-col items-center justify-center gap-8 px-4 py-10 md:-translate-y-24 lg:-translate-y-28">
         <div className="w-full max-w-5xl overflow-hidden rounded-2xl">
           <Image
             src="/TestImage1.png"
