@@ -31,6 +31,7 @@ type Msg = {
   created_at?: string | null;
   delivery_status?: string | null;
   delivery_status_at?: string | null;
+  ai_feedback_positive?: number | null;
 };
 
 type TextdripTemplate = {
@@ -124,6 +125,7 @@ export default function LeadThreadPage() {
   const [updatingAi, setUpdatingAi] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
+  const [feedbackBusyId, setFeedbackBusyId] = React.useState<number | null>(null);
   const [contactEmail, setContactEmail] = React.useState("");
   const [googleConnectedEmail, setGoogleConnectedEmail] = React.useState("");
   const [googleGmailConnected, setGoogleGmailConnected] = React.useState(false);
@@ -306,6 +308,32 @@ export default function LeadThreadPage() {
       alert("Send failed: " + msg);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleAiFeedbackToggle(msg: Msg) {
+    if (!leadId) return;
+    if (String(msg?.direction || "").toLowerCase() !== "out") return;
+    const nextPositive = Number(msg?.ai_feedback_positive || 0) !== 1;
+    try {
+      setFeedbackBusyId(Number(msg.id));
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages/${msg.id}/feedback`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positive: nextPositive }),
+      });
+      if (!r.ok) throw new Error("Feedback save failed");
+      setMessages((prev) =>
+        prev.map((m) =>
+          Number(m.id) === Number(msg.id)
+            ? { ...m, ai_feedback_positive: nextPositive ? 1 : 0 }
+            : m
+        )
+      );
+    } catch {
+      alert("Could not save AI feedback");
+    } finally {
+      setFeedbackBusyId(null);
     }
   }
 
@@ -730,6 +758,27 @@ export default function LeadThreadPage() {
                     <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
                     <div className="text-muted-foreground">{formatTime(m.created_at)}</div>
                   </div>
+                  {m.direction === "out" ? (
+                    <div className="mb-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAiFeedbackToggle(m)}
+                        disabled={feedbackBusyId === Number(m.id)}
+                        className={`rounded border px-2 py-0.5 text-[11px] ${
+                          Number(m.ai_feedback_positive || 0) === 1
+                            ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                            : "border-border bg-card/70 text-muted-foreground hover:bg-muted/40"
+                        } disabled:opacity-60`}
+                        title="Mark this AI reply as great"
+                      >
+                        {feedbackBusyId === Number(m.id)
+                          ? "Saving..."
+                          : Number(m.ai_feedback_positive || 0) === 1
+                            ? "👍 Great Reply Saved"
+                            : "👍 Great Reply"}
+                      </button>
+                    </div>
+                  ) : null}
                   {m.direction === "out" && m.delivery_status ? (
                     <div className="mb-1 text-[11px] text-muted-foreground">
                       Delivery: {String(m.delivery_status)}
