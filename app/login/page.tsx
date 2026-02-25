@@ -75,7 +75,7 @@ export default function LoginPage() {
         <div className="absolute bottom-10 right-0 h-80 w-80 rounded-full bg-sky-700/20 blur-3xl" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl -translate-y-4 flex-col items-center justify-center gap-8 px-4 py-10 md:-translate-y-8 lg:-translate-y-10">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl -translate-y-24 flex-col items-center justify-center gap-8 px-4 py-10 md:-translate-y-32 lg:-translate-y-36">
         <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-cyan-300/30 shadow-[0_0_36px_rgba(56,189,248,0.18)]">
           <Image
             src="/infinity-login.png"
@@ -88,10 +88,10 @@ export default function LoginPage() {
         </div>
 
         <div className="w-full max-w-2xl text-center">
-          <p className="text-4xl font-extrabold tracking-[0.18em] text-cyan-100 drop-shadow-[0_0_20px_rgba(56,189,248,0.35)] md:text-5xl">
+          <p className="bg-gradient-to-r from-sky-100 via-cyan-300 to-blue-400 bg-clip-text text-5xl font-extrabold tracking-[0.2em] text-transparent drop-shadow-[0_0_20px_rgba(56,189,248,0.45)] md:text-6xl">
             INFINITE DRIP
           </p>
-          <h1 className="mt-3 text-2xl font-semibold text-slate-100 md:text-3xl">Welcome Back</h1>
+          <h1 className="mt-2 text-lg font-semibold text-slate-100 md:text-xl">Welcome Back</h1>
         </div>
 
         <div className="relative w-full max-w-md">
