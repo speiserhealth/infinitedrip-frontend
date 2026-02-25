@@ -91,7 +91,7 @@ export default function LoginPage() {
           <p className="bg-gradient-to-r from-sky-100 via-cyan-300 to-blue-400 bg-clip-text text-5xl font-extrabold tracking-[0.2em] text-transparent drop-shadow-[0_0_20px_rgba(56,189,248,0.45)] md:text-6xl">
             INFINITE DRIP
           </p>
-          <h1 className="mt-2 text-lg font-semibold text-slate-100 md:text-xl">Welcome Back</h1>
+          <h1 className="mt-2 text-base font-semibold text-slate-100 md:text-lg">Welcome Back</h1>
         </div>
 
         <div className="relative w-full max-w-md">
