@@ -305,6 +305,14 @@ export default function SettingsPage() {
     loadAdminFaqs().catch((e) => setError(String(e?.message || "Admin FAQ load failed")));
   }, [isAdmin]);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!textdripModalOpen && !aiTestOpen) return;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }, [textdripModalOpen, aiTestOpen]);
+
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -1417,7 +1425,7 @@ export default function SettingsPage() {
       )}
 
       {textdripModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-6 md:pt-10">
           <button
             type="button"
             aria-label="Close Textdrip modal"
@@ -1542,7 +1550,7 @@ export default function SettingsPage() {
       ) : null}
 
       {aiTestOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-6 md:pt-10">
           <button
             type="button"
             aria-label="Close AI test modal"
