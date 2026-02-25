@@ -14,6 +14,7 @@ type SettingsResponse = {
     textdrip_webhook_secret?: string;
     textdrip_webhook_secret_set?: boolean;
     ai_first_reply_mode?: string;
+    ai_allow_quote?: boolean;
     ai_quiet_hours_enabled?: boolean;
     ai_quiet_hours_start?: string;
     ai_quiet_hours_end?: string;
@@ -36,6 +37,7 @@ type FormState = {
   textdrip_base_url: string;
   textdrip_webhook_secret: string;
   ai_first_reply_mode: "require_prior_outbound" | "allow_first_reply";
+  ai_allow_quote: boolean;
   ai_quiet_hours_enabled: boolean;
   ai_quiet_hours_start: string;
   ai_quiet_hours_end: string;
@@ -110,6 +112,7 @@ const INITIAL_FORM: FormState = {
   textdrip_base_url: "",
   textdrip_webhook_secret: "",
   ai_first_reply_mode: "require_prior_outbound",
+  ai_allow_quote: false,
   ai_quiet_hours_enabled: false,
   ai_quiet_hours_start: "22:00",
   ai_quiet_hours_end: "08:00",
@@ -237,6 +240,7 @@ export default function SettingsPage() {
           String(s.ai_first_reply_mode || "").trim().toLowerCase() === "allow_first_reply"
             ? "allow_first_reply"
             : "require_prior_outbound",
+        ai_allow_quote: !!s.ai_allow_quote,
         ai_quiet_hours_enabled: !!s.ai_quiet_hours_enabled,
         ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
         ai_quiet_hours_end: String(s.ai_quiet_hours_end || "08:00"),
@@ -637,6 +641,7 @@ export default function SettingsPage() {
     const payload: Record<string, unknown> = {
       textdrip_base_url: form.textdrip_base_url,
       ai_first_reply_mode: form.ai_first_reply_mode,
+      ai_allow_quote: !!form.ai_allow_quote,
       ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
       ai_quiet_hours_start: form.ai_quiet_hours_start,
       ai_quiet_hours_end: form.ai_quiet_hours_end,
@@ -1016,6 +1021,26 @@ export default function SettingsPage() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     Safer default keeps AI from initiating conversations unless your CRM has already texted first.
                   </p>
+                </div>
+
+                <div className="mb-3 flex items-center justify-between gap-3 rounded border border-border/70 bg-muted/30 p-3">
+                  <div>
+                    <span className="mb-1 block text-foreground font-medium">Allow AI to Quote</span>
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, AI can give age-chart based quote ranges from your configured quote rules.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onField("ai_allow_quote", !form.ai_allow_quote)}
+                    className={`rounded px-3 py-2 text-sm ${
+                      form.ai_allow_quote
+                        ? "bg-slate-900 text-white hover:bg-slate-800"
+                        : "border border-border text-muted-foreground hover:bg-muted/40"
+                    }`}
+                  >
+                    {form.ai_allow_quote ? "Enabled" : "Disabled"}
+                  </button>
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
