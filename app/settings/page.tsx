@@ -698,7 +698,10 @@ export default function SettingsPage() {
     const synced = Number(syncBody?.synced || 0);
     setTextdripTemplateSource(String(syncBody?.source_url || ""));
     await loadTextdripSetupStatus().catch(() => {});
-    return synced;
+    return {
+      synced,
+      warning: String(syncBody?.warning || ""),
+    };
   }
 
   async function onSaveTextdripConnect(runCheck = false) {
@@ -726,9 +729,12 @@ export default function SettingsPage() {
       await loadTextdripSetupStatus().catch(() => {});
 
       if (runCheck) {
-        const synced = await runTextdripConnectionCheck();
+        const checked = await runTextdripConnectionCheck();
+        const synced = Number(checked?.synced || 0);
         setSuccess(
-          `Textdrip connected and checked. Synced ${synced} template${synced === 1 ? "" : "s"}. If inbound test is still pending, send 1 inbound SMS then check again.`
+          synced > 0
+            ? `Textdrip connected and checked. Synced ${synced} template${synced === 1 ? "" : "s"}. If inbound test is still pending, send 1 inbound SMS then check again.`
+            : "Textdrip connected and checked. SMS setup looks good. If inbound test is still pending, send 1 inbound SMS then check again."
         );
       } else {
         setSuccess("Textdrip connection details saved.");
@@ -746,9 +752,12 @@ export default function SettingsPage() {
     setError("");
     setSuccess("");
     try {
-      const synced = await runTextdripConnectionCheck();
+      const checked = await runTextdripConnectionCheck();
+      const synced = Number(checked?.synced || 0);
       setSuccess(
-        `Textdrip check passed. Synced ${synced} template${synced === 1 ? "" : "s"}. If inbound test is still pending, send 1 inbound SMS then check again.`
+        synced > 0
+          ? `Textdrip check passed. Synced ${synced} template${synced === 1 ? "" : "s"}. If inbound test is still pending, send 1 inbound SMS then check again.`
+          : "Textdrip check passed. SMS setup looks good. If inbound test is still pending, send 1 inbound SMS then check again."
       );
     } catch (e: any) {
       setError(String(e?.message || "Textdrip setup check failed"));
