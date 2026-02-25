@@ -55,6 +55,7 @@ type AiFaqRow = {
   answer: string;
   active: number;
   priority: number;
+  source?: string;
   updated_at?: string | null;
   created_at?: string | null;
 };
@@ -89,6 +90,19 @@ type TextdripConnectDraft = {
   apiToken: string;
   baseUrl: string;
   webhookSecret: string;
+};
+
+type MeResponse = {
+  ok?: boolean;
+  user?: {
+    role?: string;
+  };
+};
+
+type AiTestMsg = {
+  role: "user" | "assistant";
+  text: string;
+  at: string;
 };
 
 const INITIAL_FORM: FormState = {
@@ -177,13 +191,25 @@ export default function SettingsPage() {
   const [textdripDraft, setTextdripDraft] = React.useState<TextdripConnectDraft>(INITIAL_TEXTDRIP_DRAFT);
   const [textdripAdvancedOpen, setTextdripAdvancedOpen] = React.useState(false);
   const [textdripBaseUrlEffective, setTextdripBaseUrlEffective] = React.useState("");
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   const [faqs, setFaqs] = React.useState<AiFaqRow[]>([]);
+  const [adminFaqs, setAdminFaqs] = React.useState<AiFaqRow[]>([]);
   const [faqSaving, setFaqSaving] = React.useState(false);
   const [faqBusyId, setFaqBusyId] = React.useState<number | null>(null);
+  const [adminFaqSaving, setAdminFaqSaving] = React.useState(false);
+  const [adminFaqBusyId, setAdminFaqBusyId] = React.useState<number | null>(null);
   const [newFaqQuestion, setNewFaqQuestion] = React.useState("");
   const [newFaqAnswer, setNewFaqAnswer] = React.useState("");
   const [newFaqPriority, setNewFaqPriority] = React.useState("100");
+  const [newAdminFaqQuestion, setNewAdminFaqQuestion] = React.useState("");
+  const [newAdminFaqAnswer, setNewAdminFaqAnswer] = React.useState("");
+  const [newAdminFaqPriority, setNewAdminFaqPriority] = React.useState("100");
+
+  const [aiTestOpen, setAiTestOpen] = React.useState(false);
+  const [aiTestInput, setAiTestInput] = React.useState("");
+  const [aiTestBusy, setAiTestBusy] = React.useState(false);
+  const [aiTestThread, setAiTestThread] = React.useState<AiTestMsg[]>([]);
 
   const [form, setForm] = React.useState<FormState>(INITIAL_FORM);
   const [googleStatus, setGoogleStatus] = React.useState("");
@@ -244,7 +270,20 @@ export default function SettingsPage() {
     }
   }
 
+  async function loadMeRole() {
+    try {
+      const res = await apiFetch("/api/me", { cache: "no-store" });
+      if (!res.ok) return;
+      const body = (await res.json().catch(() => ({}))) as MeResponse;
+      const role = String(body?.user?.role || "").trim().toLowerCase();
+      setIsAdmin(role === "admin");
+    } catch {
+      setIsAdmin(false);
+    }
+  }
+
   React.useEffect(() => {
+    loadMeRole().catch(() => {});
     loadSettings();
     loadFaqs().catch(() => {});
     loadCalendarStatus().catch(() => {});
@@ -256,6 +295,11 @@ export default function SettingsPage() {
     const params = new URLSearchParams(window.location.search || "");
     setGoogleStatus(String(params.get("google") || "").trim());
   }, []);
+
+  React.useEffect(() => {
+    if (!isAdmin) return;
+    loadAdminFaqs().catch((e) => setError(String(e?.message || "Admin FAQ load failed")));
+  }, [isAdmin]);
 
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -288,6 +332,32 @@ export default function SettingsPage() {
         answer: String(x?.answer || ""),
         active: Number(x?.active || 0) ? 1 : 0,
         priority: Number(x?.priority || 100),
+        updated_at: x?.updated_at || null,
+        created_at: x?.created_at || null,
+      }))
+    );
+  }
+
+  async function loadAdminFaqs() {
+    const res = await apiFetch("/api/admin/ai/default-faqs?limit=200", { cache: "no-store" });
+    if (res.status === 403) {
+      setAdminFaqs([]);
+      return;
+    }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Admin FAQ load failed (${res.status}): ${txt || "Unknown error"}`);
+    }
+    const body = await res.json().catch(() => ({}));
+    const list = Array.isArray(body?.faqs) ? body.faqs : [];
+    setAdminFaqs(
+      list.map((x: any) => ({
+        id: Number(x?.id || 0),
+        question: String(x?.question || ""),
+        answer: String(x?.answer || ""),
+        active: Number(x?.active || 0) ? 1 : 0,
+        priority: Number(x?.priority || 100),
+        source: "admin_default",
         updated_at: x?.updated_at || null,
         created_at: x?.created_at || null,
       }))
@@ -419,6 +489,132 @@ export default function SettingsPage() {
       await loadFaqs();
     } finally {
       setFaqBusyId(null);
+    }
+  }
+
+  async function createAdminFaq() {
+    const question = String(newAdminFaqQuestion || "").trim();
+    const answer = String(newAdminFaqAnswer || "").trim();
+    const priority = Math.max(1, Math.min(999, Math.floor(Number(newAdminFaqPriority || "100") || 100)));
+    if (!question || !answer) {
+      throw new Error("Question and answer are required.");
+    }
+    setAdminFaqSaving(true);
+    try {
+      const res = await apiFetch("/api/admin/ai/default-faqs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, answer, priority, active: true }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Admin FAQ create failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      setNewAdminFaqQuestion("");
+      setNewAdminFaqAnswer("");
+      setNewAdminFaqPriority("100");
+      await loadAdminFaqs();
+      setSuccess("Administrative default guardrail added.");
+    } finally {
+      setAdminFaqSaving(false);
+    }
+  }
+
+  async function toggleAdminFaqActive(row: AiFaqRow) {
+    setAdminFaqBusyId(row.id);
+    try {
+      const res = await apiFetch(`/api/admin/ai/default-faqs/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: row.active === 1 ? 0 : 1 }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Admin FAQ update failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      await loadAdminFaqs();
+    } finally {
+      setAdminFaqBusyId(null);
+    }
+  }
+
+  async function editAdminFaq(row: AiFaqRow) {
+    const nextQuestion = window.prompt("Question", row.question);
+    if (nextQuestion === null) return;
+    const nextAnswer = window.prompt("Answer", row.answer);
+    if (nextAnswer === null) return;
+    const nextPriority = window.prompt("Priority (1-999, lower is stronger)", String(row.priority || 100));
+    if (nextPriority === null) return;
+    const priority = Math.max(1, Math.min(999, Math.floor(Number(nextPriority || "100") || 100)));
+
+    setAdminFaqBusyId(row.id);
+    try {
+      const res = await apiFetch(`/api/admin/ai/default-faqs/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: String(nextQuestion || "").trim(),
+          answer: String(nextAnswer || "").trim(),
+          priority,
+        }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Admin FAQ edit failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      await loadAdminFaqs();
+    } finally {
+      setAdminFaqBusyId(null);
+    }
+  }
+
+  async function removeAdminFaq(row: AiFaqRow) {
+    if (!window.confirm("Delete this administrative default guardrail?")) return;
+    setAdminFaqBusyId(row.id);
+    try {
+      const res = await apiFetch(`/api/admin/ai/default-faqs/${row.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Admin FAQ delete failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      await loadAdminFaqs();
+    } finally {
+      setAdminFaqBusyId(null);
+    }
+  }
+
+  async function runAiTestSend() {
+    const text = String(aiTestInput || "").trim();
+    if (!text || aiTestBusy) return;
+    const userMsg: AiTestMsg = { role: "user", text, at: new Date().toISOString() };
+    const nextThread = [...aiTestThread, userMsg];
+    setAiTestThread(nextThread);
+    setAiTestInput("");
+    setAiTestBusy(true);
+    try {
+      const payloadThread = nextThread.map((m) => ({
+        direction: m.role === "assistant" ? "out" : "in",
+        text: m.text,
+      }));
+      const res = await apiFetch("/api/ai/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          thread: payloadThread,
+        }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`AI test failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const body = await res.json().catch(() => ({}));
+      const reply = String(body?.reply || "").trim() || "No reply returned.";
+      setAiTestThread((prev) => [...prev, { role: "assistant", text: reply, at: new Date().toISOString() }]);
+    } catch (e: any) {
+      setError(String(e?.message || "AI test failed"));
+    } finally {
+      setAiTestBusy(false);
     }
   }
 
@@ -990,7 +1186,16 @@ export default function SettingsPage() {
           </section>
 
           <section className="rounded border border-border/70 bg-card/70 p-4">
-            <h2 className="text-lg font-medium text-foreground">AI FAQ Guardrails</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-medium text-foreground">AI FAQ Guardrails</h2>
+              <button
+                type="button"
+                onClick={() => setAiTestOpen(true)}
+                className="rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
+              >
+                Open AI Test Console
+              </button>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Add approved Q&A so AI uses your preferred responses for common lead questions.
             </p>
@@ -1076,6 +1281,96 @@ export default function SettingsPage() {
               )}
             </div>
           </section>
+
+          {isAdmin ? (
+            <section className="rounded border border-cyan-400/30 bg-cyan-500/5 p-4">
+              <h2 className="text-lg font-medium text-foreground">Administrative Default Guardrails</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                These apply to all users by default. Account-level guardrails can override them when conflicts exist.
+              </p>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-4">
+                <input
+                  type="text"
+                  value={newAdminFaqQuestion}
+                  onChange={(e) => setNewAdminFaqQuestion(e.target.value)}
+                  placeholder="Default question"
+                  className="rounded border border-border px-3 py-2 text-sm md:col-span-2"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={newAdminFaqPriority}
+                  onChange={(e) => setNewAdminFaqPriority(e.target.value)}
+                  placeholder="Priority"
+                  className="rounded border border-border px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => createAdminFaq().catch((e) => setError(String(e?.message || "Admin FAQ create failed")))}
+                  disabled={adminFaqSaving}
+                  className="rounded bg-cyan-600 px-3 py-2 text-sm text-white hover:bg-cyan-500/100 disabled:opacity-60"
+                >
+                  {adminFaqSaving ? "Adding..." : "Add Default"}
+                </button>
+                <textarea
+                  value={newAdminFaqAnswer}
+                  onChange={(e) => setNewAdminFaqAnswer(e.target.value)}
+                  placeholder="Default approved answer"
+                  rows={3}
+                  className="rounded border border-border px-3 py-2 text-sm md:col-span-4"
+                />
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {adminFaqs.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">No administrative default guardrails yet.</div>
+                ) : (
+                  adminFaqs.map((row) => {
+                    const busy = adminFaqBusyId === row.id;
+                    return (
+                      <div key={row.id} className="rounded border border-border/70 p-3 text-sm">
+                        <div className="font-medium text-foreground">{row.question}</div>
+                        <div className="mt-1 whitespace-pre-wrap text-muted-foreground">{row.answer}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span>Priority {row.priority}</span>
+                          <span>{row.active ? "Active" : "Disabled"}</span>
+                          {row.updated_at ? <span>Updated {formatUpdatedAt(row.updated_at)}</span> : null}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleAdminFaqActive(row).catch((e) => setError(String(e?.message || "Admin FAQ update failed")))}
+                            disabled={busy}
+                            className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
+                          >
+                            {row.active ? "Disable" : "Enable"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => editAdminFaq(row).catch((e) => setError(String(e?.message || "Admin FAQ edit failed")))}
+                            disabled={busy}
+                            className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40 disabled:opacity-60"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeAdminFaq(row).catch((e) => setError(String(e?.message || "Admin FAQ delete failed")))}
+                            disabled={busy}
+                            className="rounded border border-rose-400/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          ) : null}
 
           <button
             type="submit"
@@ -1207,6 +1502,88 @@ export default function SettingsPage() {
               >
                 {textdripModalSaving ? "Running..." : "Save + Run Check"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {aiTestOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close AI test modal"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => {
+              if (!aiTestBusy) setAiTestOpen(false);
+            }}
+          />
+          <div className="relative z-10 w-full max-w-2xl rounded border border-border/70 bg-card/90 p-4 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-medium text-foreground">AI Test Console</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!aiTestBusy) setAiTestOpen(false);
+                }}
+                className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Test AI replies safely here. No SMS is sent from this console.
+            </p>
+
+            <div className="mt-3 h-72 overflow-y-auto rounded border border-border/70 bg-muted/30 p-3">
+              {aiTestThread.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Start typing to test how AI will respond.</p>
+              ) : (
+                <div className="space-y-2">
+                  {aiTestThread.map((m, idx) => (
+                    <div
+                      key={`${m.at}-${idx}`}
+                      className={`rounded p-2 text-sm ${
+                        m.role === "assistant"
+                          ? "border border-cyan-400/30 bg-cyan-500/10 text-cyan-100"
+                          : "border border-border/70 bg-card/70 text-foreground"
+                      }`}
+                    >
+                      <div className="mb-1 text-[10px] uppercase tracking-wide opacity-70">
+                        {m.role === "assistant" ? "AI" : "You"}
+                      </div>
+                      <div className="whitespace-pre-wrap">{m.text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2">
+              <textarea
+                value={aiTestInput}
+                onChange={(e) => setAiTestInput(e.target.value)}
+                placeholder="Type a lead message to test..."
+                rows={3}
+                className="w-full rounded border border-border px-3 py-2 text-sm"
+              />
+              <div className="flex flex-wrap justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAiTestThread([])}
+                  disabled={aiTestBusy || aiTestThread.length === 0}
+                  className="rounded border border-border px-3 py-2 text-xs hover:bg-muted/40 disabled:opacity-60"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runAiTestSend().catch((e) => setError(String(e?.message || "AI test failed")))}
+                  disabled={aiTestBusy || !String(aiTestInput || "").trim()}
+                  className="rounded bg-cyan-600 px-3 py-2 text-xs font-medium text-white hover:bg-cyan-500/100 disabled:opacity-60"
+                >
+                  {aiTestBusy ? "Generating..." : "Send Test Message"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
