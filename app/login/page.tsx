@@ -28,25 +28,31 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const pre = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      try {
+        const pre = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
 
-      if (!pre.ok) {
-        const body = await pre.json().catch(() => ({}));
-        const err = String(body?.error || "");
-        if (pre.status === 403 && err === "pending_approval") {
-          setError("Your account is pending admin approval.");
+        if (!pre.ok) {
+          const body = await pre.json().catch(() => ({}));
+          const err = String(body?.error || "");
+          if (pre.status === 403 && err === "pending_approval") {
+            setError("Your account is pending admin approval.");
+            return;
+          }
+          if (pre.status === 403 && err === "access_disabled") {
+            setError("Your account access is currently disabled. Contact support.");
+            return;
+          }
+          setError("Invalid email or password.");
           return;
         }
-        if (pre.status === 403 && err === "access_disabled") {
-          setError("Your account access is currently disabled. Contact support.");
-          return;
-        }
-        setError("Invalid email or password.");
-        return;
+      } catch (preErr) {
+        // Local dev can block this browser-side precheck via CORS;
+        // we still attempt signIn through NextAuth server route.
+        console.warn("Login precheck skipped:", preErr);
       }
 
       const result = await signIn("credentials", {
@@ -62,6 +68,8 @@ export default function LoginPage() {
 
       router.push("/dashboard");
       router.refresh();
+    } catch {
+      setError("Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
