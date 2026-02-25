@@ -143,6 +143,8 @@ export default function LeadThreadPage() {
   const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const lastHistorySyncAtRef = React.useRef(0);
+  const historySyncInFlightRef = React.useRef(false);
+  const threadLoadInFlightRef = React.useRef(false);
 
   async function loadTemplates() {
     const r = await apiFetch(`${API_BASE}/api/textdrip/templates`, { cache: "no-store" });
@@ -152,7 +154,7 @@ export default function LeadThreadPage() {
     setTemplates(list);
   }
 
-  async function loadThread({ syncHistory = false }: { syncHistory?: boolean } = {}) {
+  async function loadThread() {
     if (!leadId) return;
 
     const lr = await apiFetch(`${API_BASE}/api/leads?include_archived=1`, { cache: "no-store" });
@@ -166,17 +168,35 @@ export default function LeadThreadPage() {
       setNotesDraft((prev) => (prev === "" ? found.notes || "" : prev));
     }
 
-    const query = syncHistory ? "?sync=1" : "";
-    const mr = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages${query}`, { cache: "no-store" });
+    const mr = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages`, { cache: "no-store" });
     const mdata = await mr.json();
     const msgs: Msg[] = Array.isArray(mdata) ? mdata : mdata?.messages ?? [];
     setMessages(msgs);
-    if (syncHistory) lastHistorySyncAtRef.current = Date.now();
+  }
+
+  async function syncThreadHistory() {
+    if (!leadId || historySyncInFlightRef.current) return;
+    historySyncInFlightRef.current = true;
+    try {
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages/sync`, {
+        method: "POST",
+      });
+      lastHistorySyncAtRef.current = Date.now();
+      if (r.ok) {
+        await loadThread();
+      }
+    } catch {
+      lastHistorySyncAtRef.current = Date.now();
+    } finally {
+      historySyncInFlightRef.current = false;
+    }
   }
 
   React.useEffect(() => {
     if (!leadId) return;
     lastHistorySyncAtRef.current = 0;
+    historySyncInFlightRef.current = false;
+    threadLoadInFlightRef.current = false;
     try {
       const stored = window.localStorage.getItem(`lead_email_${String(leadId)}`) || "";
       const normalized = normalizeEmail(stored);
@@ -186,14 +206,22 @@ export default function LeadThreadPage() {
     let dead = false;
 
     async function tick() {
+      if (threadLoadInFlightRef.current) return;
+      threadLoadInFlightRef.current = true;
       try {
-        const shouldSyncHistory =
+        await loadThread();
+        const shouldSyncHistory = (
           lastHistorySyncAtRef.current === 0 ||
-          (Date.now() - lastHistorySyncAtRef.current) >= HISTORY_SYNC_INTERVAL_MS;
-        await loadThread({ syncHistory: shouldSyncHistory });
+          (Date.now() - lastHistorySyncAtRef.current) >= HISTORY_SYNC_INTERVAL_MS
+        );
+        if (shouldSyncHistory) {
+          void syncThreadHistory();
+        }
         if (!dead) setError("");
       } catch {
         if (!dead) setError("Load failed");
+      } finally {
+        threadLoadInFlightRef.current = false;
       }
     }
 
