@@ -78,7 +78,7 @@ export default function LoginPage() {
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl -translate-y-24 flex-col items-center justify-center gap-8 px-4 py-10 md:-translate-y-32 lg:-translate-y-36">
         <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-cyan-300/30 shadow-[0_0_36px_rgba(56,189,248,0.18)]">
           <Image
-            src="/infinity-login.png"
+            src="/TestImage1.png"
             alt="Infinite symbol brand artwork"
             width={1536}
             height={1024}
