@@ -90,7 +90,7 @@ export default function DashboardPage() {
         <div className="grid items-center gap-2 md:grid-cols-[1.4fr_1fr]">
           <div className="relative min-h-[170px] md:min-h-[220px]">
             <Image
-              src="/infinity-hero.svg"
+              src="/TestImage1.png"
               alt="InfiniteDrip infinity brand graphic"
               fill
               className="object-cover"
