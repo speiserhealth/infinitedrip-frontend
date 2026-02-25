@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -75,6 +76,17 @@ export default function LoginPage() {
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-4 py-10">
+        <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-cyan-300/30 shadow-[0_0_36px_rgba(56,189,248,0.18)]">
+          <Image
+            src="/infinity-login.png"
+            alt="Infinite symbol brand artwork"
+            width={1536}
+            height={1024}
+            priority
+            className="h-auto w-full object-cover"
+          />
+        </div>
+
         <div className="w-full max-w-2xl text-center">
           <p className="text-4xl font-extrabold tracking-[0.18em] text-cyan-100 drop-shadow-[0_0_20px_rgba(56,189,248,0.35)] md:text-5xl">
             INFINITE DRIP
