@@ -87,6 +87,104 @@ function formatAge(v?: string | null) {
   return `${mins}m`;
 }
 
+const STATE_TZ_LABEL: Record<string, string> = {
+  AL: "CST",
+  AK: "AKST",
+  AZ: "MTN",
+  AR: "CST",
+  CA: "PST",
+  CO: "MTN",
+  CT: "EST",
+  DE: "EST",
+  FL: "EST",
+  GA: "EST",
+  HI: "HST",
+  ID: "MTN",
+  IL: "CST",
+  IN: "EST",
+  IA: "CST",
+  KS: "CST",
+  KY: "EST",
+  LA: "CST",
+  ME: "EST",
+  MD: "EST",
+  MA: "EST",
+  MI: "EST",
+  MN: "CST",
+  MS: "CST",
+  MO: "CST",
+  MT: "MTN",
+  NE: "CST",
+  NV: "PST",
+  NH: "EST",
+  NJ: "EST",
+  NM: "MTN",
+  NY: "EST",
+  NC: "EST",
+  ND: "CST",
+  OH: "EST",
+  OK: "CST",
+  OR: "PST",
+  PA: "EST",
+  RI: "EST",
+  SC: "EST",
+  SD: "CST",
+  TN: "CST",
+  TX: "CST",
+  UT: "MTN",
+  VT: "EST",
+  VA: "EST",
+  WA: "PST",
+  WV: "EST",
+  WI: "CST",
+  WY: "MTN",
+  DC: "EST",
+};
+
+function inferTimezoneLabel(lead: Lead): string {
+  const state = String(lead?.state || "").trim().toUpperCase();
+  const tz = String(lead?.lead_timezone || "").trim().toLowerCase();
+
+  let label = "";
+  if (state && STATE_TZ_LABEL[state]) {
+    label = STATE_TZ_LABEL[state];
+  } else if (tz) {
+    if (
+      tz.includes("new_york") ||
+      tz.includes("detroit") ||
+      tz.includes("indiana") ||
+      tz.includes("kentucky") ||
+      tz.includes("toronto")
+    ) {
+      label = "EST";
+    } else if (
+      tz.includes("chicago") ||
+      tz.includes("winnipeg")
+    ) {
+      label = "CST";
+    } else if (
+      tz.includes("denver") ||
+      tz.includes("boise") ||
+      tz.includes("phoenix")
+    ) {
+      label = "MTN";
+    } else if (
+      tz.includes("los_angeles") ||
+      tz.includes("vancouver")
+    ) {
+      label = "PST";
+    } else if (tz.includes("anchorage")) {
+      label = "AKST";
+    } else if (tz.includes("honolulu")) {
+      label = "HST";
+    }
+  }
+
+  if (!label) return "-";
+  if (state) return `${label} (${state})`;
+  return label;
+}
+
 function renderSourceBadge(v?: string | null) {
   const s = String(v || "manual");
 
@@ -445,7 +543,7 @@ export default function LeadsPage() {
   }, [leads, sort]);
 
   return (
-    <div className="mx-auto max-w-6xl rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-5">
+    <div className="mx-auto w-full max-w-[1680px] rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-5">
       <div className="mb-3 flex flex-col md:flex-row md:items-start md:justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Leads</h1>
@@ -548,7 +646,7 @@ export default function LeadsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs md:text-sm">
+          <table className="min-w-[1220px] w-full text-xs md:text-sm">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-1.5">Lead</th>
@@ -604,9 +702,7 @@ export default function LeadsPage() {
                     </td>
 
                     <td className="px-3 py-1.5">{renderSourceBadge(l.source)}</td>
-                    <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
-                      {String(l.lead_timezone || "").trim() || "-"}
-                    </td>
+                    <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{inferTimezoneLabel(l)}</td>
 
                     <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{formatCreated(l.createdAt)}</td>
                     <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{formatAge(l.createdAt)}</td>

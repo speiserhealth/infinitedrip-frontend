@@ -57,6 +57,8 @@ type AutoFollowupRule = {
 type AutoFollowupConfig = {
   quote_missing_info: AutoFollowupRule;
   quoted_not_booked: AutoFollowupRule;
+  no_response_hours: AutoFollowupRule;
+  no_response_days: AutoFollowupRule;
   missed_appointment: AutoFollowupRule;
 };
 
@@ -70,6 +72,16 @@ const DEFAULT_AUTO_FOLLOWUP_CONFIG: AutoFollowupConfig = {
     enabled: true,
     delay_minutes: 180,
     message: "Quick follow-up on your quote range. Do you have time this morning, this afternoon, or this evening for a short call?",
+  },
+  no_response_hours: {
+    enabled: false,
+    delay_minutes: 180,
+    message: "Checking in. Do you still want to continue with this?",
+  },
+  no_response_days: {
+    enabled: false,
+    delay_minutes: 1440,
+    message: "Just following up. Reply when you are ready and we can keep this moving.",
   },
   missed_appointment: {
     enabled: true,
@@ -94,6 +106,16 @@ const AUTO_FOLLOWUP_RULE_META: Array<{
     description: "Lead received quote but has not booked an appointment.",
   },
   {
+    key: "no_response_hours",
+    title: "No Response (Hours)",
+    description: "Lead has not replied within your selected hour-based timeline.",
+  },
+  {
+    key: "no_response_days",
+    title: "No Response (Days)",
+    description: "Lead has not replied within your selected day-based timeline.",
+  },
+  {
     key: "missed_appointment",
     title: "Missed Appointment",
     description: "Lead missed a booked appointment and needs reschedule follow-up.",
@@ -110,6 +132,8 @@ const AUTO_FOLLOWUP_DELAY_OPTIONS = [
   { value: 720, label: "12 hours" },
   { value: 1440, label: "24 hours" },
   { value: 2880, label: "48 hours" },
+  { value: 4320, label: "3 days" },
+  { value: 10080, label: "7 days" },
 ];
 
 function formatTime(raw?: string | null) {
@@ -171,6 +195,8 @@ function normalizeAutoFollowupConfig(input: any): AutoFollowupConfig {
   const next: AutoFollowupConfig = {
     quote_missing_info: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.quote_missing_info },
     quoted_not_booked: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.quoted_not_booked },
+    no_response_hours: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.no_response_hours },
+    no_response_days: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.no_response_days },
     missed_appointment: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.missed_appointment },
   };
   (Object.keys(next) as Array<keyof AutoFollowupConfig>).forEach((key) => {
@@ -1317,6 +1343,7 @@ export default function LeadThreadPage() {
             </div>
             <div className="mb-3 text-xs text-muted-foreground">
               Set follow-up message type and delay for each scenario. Messages send exactly as written.
+              Countdown tracking is internal and resets when the lead replies.
             </div>
 
             <div className="space-y-3">
