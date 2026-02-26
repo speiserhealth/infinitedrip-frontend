@@ -38,6 +38,7 @@ type Msg = {
   delivery_status?: string | null;
   delivery_status_at?: string | null;
   ai_feedback_positive?: number | null;
+  ai_feedback_negative?: number | null;
 };
 
 type TextdripTemplate = {
@@ -294,7 +295,7 @@ export default function LeadThreadPage() {
   const [autoFollowupDraft, setAutoFollowupDraft] = React.useState<AutoFollowupConfig | null>(null);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
-  const [feedbackBusyId, setFeedbackBusyId] = React.useState<number | null>(null);
+  const [feedbackBusyKey, setFeedbackBusyKey] = React.useState<string | null>(null);
   const [contactEmail, setContactEmail] = React.useState("");
   const [googleConnectedEmail, setGoogleConnectedEmail] = React.useState("");
   const [googleGmailConnected, setGoogleGmailConnected] = React.useState(false);
@@ -556,29 +557,45 @@ export default function LeadThreadPage() {
     }
   }
 
-  async function handleAiFeedbackToggle(msg: Msg) {
+  async function handleAiFeedbackToggle(msg: Msg, feedbackType: "positive" | "negative") {
     if (!leadId) return;
     if (String(msg?.direction || "").toLowerCase() !== "out") return;
-    const nextPositive = Number(msg?.ai_feedback_positive || 0) !== 1;
+    const nextActive = feedbackType === "positive"
+      ? Number(msg?.ai_feedback_positive || 0) !== 1
+      : Number(msg?.ai_feedback_negative || 0) !== 1;
+    const busyKey = `${Number(msg.id)}:${feedbackType}`;
     try {
-      setFeedbackBusyId(Number(msg.id));
+      setFeedbackBusyKey(busyKey);
       const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/messages/${msg.id}/feedback`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ positive: nextPositive }),
+        body: JSON.stringify({
+          feedback_type: feedbackType,
+          active: nextActive,
+        }),
       });
       if (!r.ok) throw new Error("Feedback save failed");
       setMessages((prev) =>
         prev.map((m) =>
           Number(m.id) === Number(msg.id)
-            ? { ...m, ai_feedback_positive: nextPositive ? 1 : 0 }
+            ? {
+                ...m,
+                ai_feedback_positive:
+                  feedbackType === "positive"
+                    ? (nextActive ? 1 : 0)
+                    : Number(m.ai_feedback_positive || 0),
+                ai_feedback_negative:
+                  feedbackType === "negative"
+                    ? (nextActive ? 1 : 0)
+                    : Number(m.ai_feedback_negative || 0),
+              }
             : m
         )
       );
     } catch {
       alert("Could not save AI feedback");
     } finally {
-      setFeedbackBusyId(null);
+      setFeedbackBusyKey(null);
     }
   }
 
@@ -1210,34 +1227,55 @@ export default function LeadThreadPage() {
                     <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
                     <div className="text-muted-foreground">{formatTime(m.created_at)}</div>
                   </div>
-                  {m.direction === "out" ? (
-                    <div className="mb-1 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAiFeedbackToggle(m)}
-                        disabled={feedbackBusyId === Number(m.id)}
-                        className={`rounded border px-2 py-0.5 text-[11px] ${
-                          Number(m.ai_feedback_positive || 0) === 1
-                            ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
-                            : "border-border bg-card/70 text-muted-foreground hover:bg-muted/40"
-                        } disabled:opacity-60`}
-                        title="Mark this AI reply as great"
-                      >
-                        {feedbackBusyId === Number(m.id)
-                          ? "Saving..."
-                          : Number(m.ai_feedback_positive || 0) === 1
-                            ? "👍 Great Reply Saved"
-                            : "👍 Great Reply"}
-                      </button>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      {m.direction === "out" && m.delivery_status ? (
+                        <div className="mb-1 text-[11px] text-muted-foreground">
+                          Delivery: {String(m.delivery_status)}
+                          {m.delivery_status_at ? ` (${formatTime(m.delivery_status_at)})` : ""}
+                        </div>
+                      ) : null}
+                      <div className="whitespace-pre-wrap text-sm">{m.text}</div>
                     </div>
-                  ) : null}
-                  {m.direction === "out" && m.delivery_status ? (
-                    <div className="mb-1 text-[11px] text-muted-foreground">
-                      Delivery: {String(m.delivery_status)}
-                      {m.delivery_status_at ? ` (${formatTime(m.delivery_status_at)})` : ""}
-                    </div>
-                  ) : null}
-                  <div className="whitespace-pre-wrap text-sm">{m.text}</div>
+                    {m.direction === "out" ? (
+                      <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleAiFeedbackToggle(m, "positive")}
+                          disabled={feedbackBusyKey === `${Number(m.id)}:positive`}
+                          className={`rounded border px-2 py-0.5 text-[10px] leading-tight ${
+                            Number(m.ai_feedback_positive || 0) === 1
+                              ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                              : "border-border bg-card/70 text-muted-foreground hover:bg-muted/40"
+                          } disabled:opacity-60`}
+                          title="Mark this AI reply as great"
+                        >
+                          {feedbackBusyKey === `${Number(m.id)}:positive`
+                            ? "Saving..."
+                            : Number(m.ai_feedback_positive || 0) === 1
+                              ? "👍 Great Saved"
+                              : "👍 Great Reply"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAiFeedbackToggle(m, "negative")}
+                          disabled={feedbackBusyKey === `${Number(m.id)}:negative`}
+                          className={`rounded border px-2 py-0.5 text-[10px] leading-tight ${
+                            Number(m.ai_feedback_negative || 0) === 1
+                              ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                              : "border-border bg-card/70 text-muted-foreground hover:bg-muted/40"
+                          } disabled:opacity-60`}
+                          title="Mark this AI reply as poor for review"
+                        >
+                          {feedbackBusyKey === `${Number(m.id)}:negative`
+                            ? "Saving..."
+                            : Number(m.ai_feedback_negative || 0) === 1
+                              ? "💩 Shit Saved"
+                              : "💩 Shit Reply"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ))
             )}
