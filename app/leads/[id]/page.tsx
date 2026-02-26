@@ -289,6 +289,7 @@ export default function LeadThreadPage() {
   const [updatingLeadQuote, setUpdatingLeadQuote] = React.useState(false);
   const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
   const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
+  const [autoFollowupDraftDirty, setAutoFollowupDraftDirty] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [feedbackBusyId, setFeedbackBusyId] = React.useState<number | null>(null);
@@ -332,12 +333,14 @@ export default function LeadThreadPage() {
 
     setLead(found);
     if (found) {
-      setAutoFollowupEnabled(Number(found.auto_followup_enabled || 0) === 1);
-      try {
-        const parsed = JSON.parse(String(found.auto_followup_config || "{}"));
-        setAutoFollowupConfig(normalizeAutoFollowupConfig(parsed));
-      } catch {
-        setAutoFollowupConfig(normalizeAutoFollowupConfig({}));
+      if (!showAutoFollowupModal || !autoFollowupDraftDirty) {
+        setAutoFollowupEnabled(Number(found.auto_followup_enabled || 0) === 1);
+        try {
+          const parsed = JSON.parse(String(found.auto_followup_config || "{}"));
+          setAutoFollowupConfig(normalizeAutoFollowupConfig(parsed));
+        } catch {
+          setAutoFollowupConfig(normalizeAutoFollowupConfig({}));
+        }
       }
     }
 
@@ -409,7 +412,7 @@ export default function LeadThreadPage() {
       dead = true;
       clearInterval(t);
     };
-  }, [leadId, API_BASE]);
+  }, [leadId, API_BASE, showAutoFollowupModal, autoFollowupDraftDirty]);
 
   React.useEffect(() => {
     const emailFromLead = normalizeEmail(String(lead?.email || ""));
@@ -726,6 +729,7 @@ export default function LeadThreadPage() {
             }
           : prev
       );
+      setAutoFollowupDraftDirty(false);
     } catch {
       alert("Automatic follow-up toggle failed");
     } finally {
@@ -758,6 +762,7 @@ export default function LeadThreadPage() {
             }
           : prev
       );
+      setAutoFollowupDraftDirty(false);
       setShowAutoFollowupModal(false);
     } catch {
       alert("Automatic follow-up save failed");
@@ -879,6 +884,7 @@ export default function LeadThreadPage() {
     key: keyof AutoFollowupConfig,
     patch: Partial<AutoFollowupRule>
   ) {
+    setAutoFollowupDraftDirty(true);
     setAutoFollowupConfig((prev) => ({
       ...prev,
       [key]: {
@@ -1112,7 +1118,10 @@ export default function LeadThreadPage() {
             </div>
             <button
               type="button"
-              onClick={() => setShowAutoFollowupModal(true)}
+              onClick={() => {
+                setAutoFollowupDraftDirty(false);
+                setShowAutoFollowupModal(true);
+              }}
               disabled={updatingAutoFollowup}
               className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-500/25"
             >
@@ -1335,7 +1344,10 @@ export default function LeadThreadPage() {
               <div className="text-base font-semibold">Automatic Followup</div>
               <button
                 type="button"
-                onClick={() => setShowAutoFollowupModal(false)}
+                onClick={() => {
+                  setAutoFollowupDraftDirty(false);
+                  setShowAutoFollowupModal(false);
+                }}
                 className="rounded border border-border px-3 py-1 text-sm"
               >
                 Close
@@ -1408,7 +1420,10 @@ export default function LeadThreadPage() {
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowAutoFollowupModal(false)}
+                onClick={() => {
+                  setAutoFollowupDraftDirty(false);
+                  setShowAutoFollowupModal(false);
+                }}
                 className="rounded border border-border px-3 py-2 text-sm"
               >
                 Cancel
