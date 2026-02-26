@@ -290,6 +290,7 @@ export default function LeadThreadPage() {
   const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
   const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
   const [autoFollowupDraftDirty, setAutoFollowupDraftDirty] = React.useState(false);
+  const [autoFollowupDraft, setAutoFollowupDraft] = React.useState<AutoFollowupConfig | null>(null);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [feedbackBusyId, setFeedbackBusyId] = React.useState<number | null>(null);
@@ -311,6 +312,8 @@ export default function LeadThreadPage() {
 
   const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const autoFollowupModalOpenRef = React.useRef(false);
+  const autoFollowupDraftDirtyRef = React.useRef(false);
   const lastHistorySyncAtRef = React.useRef(0);
   const historySyncInFlightRef = React.useRef(false);
   const threadLoadInFlightRef = React.useRef(false);
@@ -333,7 +336,7 @@ export default function LeadThreadPage() {
 
     setLead(found);
     if (found) {
-      if (!showAutoFollowupModal || !autoFollowupDraftDirty) {
+      if (!autoFollowupModalOpenRef.current || !autoFollowupDraftDirtyRef.current) {
         setAutoFollowupEnabled(Number(found.auto_followup_enabled || 0) === 1);
         try {
           const parsed = JSON.parse(String(found.auto_followup_config || "{}"));
@@ -371,6 +374,14 @@ export default function LeadThreadPage() {
       historySyncInFlightRef.current = false;
     }
   }
+
+  React.useEffect(() => {
+    autoFollowupModalOpenRef.current = showAutoFollowupModal;
+  }, [showAutoFollowupModal]);
+
+  React.useEffect(() => {
+    autoFollowupDraftDirtyRef.current = autoFollowupDraftDirty;
+  }, [autoFollowupDraftDirty]);
 
   React.useEffect(() => {
     if (!leadId) return;
@@ -412,7 +423,7 @@ export default function LeadThreadPage() {
       dead = true;
       clearInterval(t);
     };
-  }, [leadId, API_BASE, showAutoFollowupModal, autoFollowupDraftDirty]);
+  }, [leadId, API_BASE]);
 
   React.useEffect(() => {
     const emailFromLead = normalizeEmail(String(lead?.email || ""));
@@ -729,6 +740,8 @@ export default function LeadThreadPage() {
             }
           : prev
       );
+      setAutoFollowupDraft(null);
+      autoFollowupDraftDirtyRef.current = false;
       setAutoFollowupDraftDirty(false);
     } catch {
       alert("Automatic follow-up toggle failed");
@@ -746,7 +759,7 @@ export default function LeadThreadPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: autoFollowupEnabled,
-          config: autoFollowupConfig,
+          config: autoFollowupDraft || autoFollowupConfig,
         }),
       });
       if (!r.ok) throw new Error("Automatic follow-up save failed");
@@ -762,6 +775,8 @@ export default function LeadThreadPage() {
             }
           : prev
       );
+      setAutoFollowupDraft(null);
+      autoFollowupDraftDirtyRef.current = false;
       setAutoFollowupDraftDirty(false);
       setShowAutoFollowupModal(false);
     } catch {
@@ -879,19 +894,24 @@ export default function LeadThreadPage() {
   const leadTz = String(lead?.lead_timezone || "").trim();
   const leadLocation = [[leadCity, leadState].filter(Boolean).join(", "), leadZip].filter(Boolean).join(" ").trim();
   const leadLocationLine = [leadLocation, leadTz ? `(${leadTz})` : ""].filter(Boolean).join(" ");
+  const autoFollowupModalConfig = autoFollowupDraft || autoFollowupConfig;
 
   function updateAutoFollowupRule(
     key: keyof AutoFollowupConfig,
     patch: Partial<AutoFollowupRule>
   ) {
+    autoFollowupDraftDirtyRef.current = true;
     setAutoFollowupDraftDirty(true);
-    setAutoFollowupConfig((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        ...patch,
-      },
-    }));
+    setAutoFollowupDraft((prev) => {
+      const base = prev || autoFollowupConfig;
+      return {
+        ...base,
+        [key]: {
+          ...base[key],
+          ...patch,
+        },
+      };
+    });
   }
 
   return (
@@ -1119,6 +1139,8 @@ export default function LeadThreadPage() {
             <button
               type="button"
               onClick={() => {
+                setAutoFollowupDraft(normalizeAutoFollowupConfig(autoFollowupConfig));
+                autoFollowupDraftDirtyRef.current = false;
                 setAutoFollowupDraftDirty(false);
                 setShowAutoFollowupModal(true);
               }}
@@ -1345,6 +1367,8 @@ export default function LeadThreadPage() {
               <button
                 type="button"
                 onClick={() => {
+                  setAutoFollowupDraft(null);
+                  autoFollowupDraftDirtyRef.current = false;
                   setAutoFollowupDraftDirty(false);
                   setShowAutoFollowupModal(false);
                 }}
@@ -1360,7 +1384,7 @@ export default function LeadThreadPage() {
 
             <div className="space-y-3">
               {AUTO_FOLLOWUP_RULE_META.map(({ key, title, description }) => {
-                const rule = autoFollowupConfig[key];
+                const rule = autoFollowupModalConfig[key];
                 return (
                   <div key={key} className="rounded border border-border/70 bg-card/60 p-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -1421,6 +1445,8 @@ export default function LeadThreadPage() {
               <button
                 type="button"
                 onClick={() => {
+                  setAutoFollowupDraft(null);
+                  autoFollowupDraftDirtyRef.current = false;
                   setAutoFollowupDraftDirty(false);
                   setShowAutoFollowupModal(false);
                 }}
