@@ -1120,7 +1120,7 @@ export default function LeadThreadPage() {
                   : "border-rose-400/40 bg-rose-500/15 text-rose-200"
               }`}
             >
-              {updatingAi ? "Saving..." : `AI ${aiOn ? "Active" : "Disabled"}`}
+              {updatingAi ? "Saving..." : `AI ${aiOn ? "Enabled" : "Disabled"}`}
             </button>
             <button
               type="button"
