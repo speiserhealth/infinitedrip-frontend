@@ -286,6 +286,7 @@ export default function LeadThreadPage() {
   const [q, setQ] = React.useState("");
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
   const [updatingAi, setUpdatingAi] = React.useState(false);
+  const [resumingAi, setResumingAi] = React.useState(false);
   const [updatingLeadQuote, setUpdatingLeadQuote] = React.useState(false);
   const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
   const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
@@ -675,6 +676,36 @@ export default function LeadThreadPage() {
       alert("AI toggle failed");
     } finally {
       setUpdatingAi(false);
+    }
+  }
+
+  async function handleResumeAi() {
+    if (!leadId) return;
+    try {
+      setResumingAi(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/ai/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reactivate: true }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok || !body?.ok) throw new Error(String(body?.error || "AI resume failed"));
+
+      const reason = String(body?.result?.reason || "");
+      if (reason === "replied") {
+        alert("AI resumed and sent a reply.");
+      } else if (body?.queued) {
+        alert("AI resume queued. It will continue automatically.");
+      } else if (reason === "no_pending_inbound") {
+        alert("AI resumed. There is no pending inbound message right now.");
+      } else {
+        alert(`AI resume completed: ${reason || "ok"}`);
+      }
+      await loadThread();
+    } catch {
+      alert("AI resume failed");
+    } finally {
+      setResumingAi(false);
     }
   }
 
@@ -1121,6 +1152,15 @@ export default function LeadThreadPage() {
               }`}
             >
               {updatingAi ? "Saving..." : `AI ${aiOn ? "Enabled" : "Disabled"}`}
+            </button>
+            <button
+              type="button"
+              onClick={handleResumeAi}
+              disabled={resumingAi}
+              className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-sm text-cyan-200"
+              title="Re-activate AI and continue from pending inbound"
+            >
+              {resumingAi ? "Resuming..." : "Resume AI"}
             </button>
             <button
               type="button"
