@@ -18,6 +18,7 @@ type Lead = {
   lead_timezone?: string | null;
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
+  ai_allow_quote_override?: number | null;
   ai_paused?: number | null;
   ai_cooldown_until?: string | null;
   ai_pause_reason?: string | null;
@@ -83,6 +84,14 @@ function normalizeStatus(s: any): LeadStatus {
   if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
   if (v === "cold" || v === "booked" || v === "sold" || v === "dead") return v;
   return "engaged";
+}
+
+function normalizeOptionalBitToBool(value: any): boolean | null {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const v = String(value).trim().toLowerCase();
+  if (v === "1" || v === "true") return true;
+  if (v === "0" || v === "false") return false;
+  return null;
 }
 
 function normalizeEmail(input: string) {
@@ -161,12 +170,14 @@ export default function LeadThreadPage() {
   const [q, setQ] = React.useState("");
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
   const [updatingAi, setUpdatingAi] = React.useState(false);
+  const [updatingLeadQuote, setUpdatingLeadQuote] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [feedbackBusyId, setFeedbackBusyId] = React.useState<number | null>(null);
   const [contactEmail, setContactEmail] = React.useState("");
   const [googleConnectedEmail, setGoogleConnectedEmail] = React.useState("");
   const [googleGmailConnected, setGoogleGmailConnected] = React.useState(false);
+  const [globalAllowQuote, setGlobalAllowQuote] = React.useState(false);
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -288,6 +299,23 @@ export default function LeadThreadPage() {
         if (dead) return;
         setGoogleGmailConnected(!!status?.gmail_connected);
         setGoogleConnectedEmail(normalizeEmail(String(status?.account_email || "")));
+      } catch {}
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [API_BASE]);
+
+  React.useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await apiFetch(`${API_BASE}/api/settings`, { cache: "no-store" });
+        if (!r.ok) return;
+        const body = await r.json().catch(() => ({}));
+        const settings = body?.settings || {};
+        if (dead) return;
+        setGlobalAllowQuote(!!settings?.ai_allow_quote);
       } catch {}
     })();
     return () => {
@@ -507,6 +535,46 @@ export default function LeadThreadPage() {
     }
   }
 
+  async function handleLeadQuoteToggle() {
+    if (!leadId) return;
+    const override = normalizeOptionalBitToBool(lead?.ai_allow_quote_override);
+    const effective = override === null ? globalAllowQuote : override;
+    try {
+      setUpdatingLeadQuote(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/quote`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !effective }),
+      });
+      if (!r.ok) throw new Error("Quote toggle failed");
+      const updated = await r.json().catch(() => ({}));
+      setLead((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch {
+      alert("Quote toggle failed");
+    } finally {
+      setUpdatingLeadQuote(false);
+    }
+  }
+
+  async function handleLeadQuoteUseGlobal() {
+    if (!leadId) return;
+    try {
+      setUpdatingLeadQuote(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/quote`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ use_default: true }),
+      });
+      if (!r.ok) throw new Error("Quote default reset failed");
+      const updated = await r.json().catch(() => ({}));
+      setLead((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch {
+      alert("Quote reset failed");
+    } finally {
+      setUpdatingLeadQuote(false);
+    }
+  }
+
   async function handleHotToggle(nextHot: boolean) {
     if (!leadId) return;
     try {
@@ -603,6 +671,9 @@ export default function LeadThreadPage() {
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
   const aiSignal = getAiSignal(lead);
+  const quoteOverride = normalizeOptionalBitToBool(lead?.ai_allow_quote_override);
+  const quoteEffective = quoteOverride === null ? globalAllowQuote : quoteOverride;
+  const quoteFrom = quoteOverride === null ? "Global" : "Lead";
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
   const leadCity = String(lead?.city || "").trim();
@@ -706,6 +777,43 @@ export default function LeadThreadPage() {
             </span>
             {aiSignal.label}
           </span>
+          <span
+            className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${
+              quoteEffective
+                ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+                : "border-rose-400/40 bg-rose-500/15 text-rose-300"
+            }`}
+          >
+            💬 Quote {quoteEffective ? "Enabled" : "Disabled"} ({quoteFrom})
+          </span>
+          <button
+            type="button"
+            onClick={handleLeadQuoteToggle}
+            disabled={updatingLeadQuote}
+            className={`rounded border px-2 py-1 text-sm ${
+              quoteEffective
+                ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+            }`}
+            title="Enable/disable quote mode for this specific lead"
+          >
+            {updatingLeadQuote
+              ? "Saving..."
+              : quoteEffective
+                ? "Disable Quote (Lead)"
+                : "Enable Quote (Lead)"}
+          </button>
+          {quoteOverride !== null ? (
+            <button
+              type="button"
+              onClick={handleLeadQuoteUseGlobal}
+              disabled={updatingLeadQuote}
+              className="rounded border border-border bg-card/70 px-2 py-1 text-sm text-muted-foreground"
+              title="Clear per-lead override and use global quote mode"
+            >
+              Use Global Quote Mode
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => handleHotToggle(!hot)}
