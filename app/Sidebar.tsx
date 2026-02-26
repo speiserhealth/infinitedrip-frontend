@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import * as React from "react";
 import { apiFetch } from "@/lib/apiFetch";
-import ThemeToggle from "./ThemeToggle";
 
 const baseNavItems = [
   { href: "/dashboard", label: "Dashboard" },
@@ -96,13 +95,9 @@ export default function Sidebar() {
         {billingNavItem.label}
       </Link>
 
-      <div>
-        <ThemeToggle />
-      </div>
-
       <button
         onClick={handleLogout}
-        className="mt-3 rounded border border-slate-600 bg-slate-800/85 px-3 py-2 text-sm text-cyan-100 hover:bg-slate-700/90"
+        className="rounded border border-slate-600 bg-slate-800/85 px-3 py-2 text-sm text-cyan-100 hover:bg-slate-700/90"
       >
         Logout
       </button>

@@ -19,6 +19,8 @@ type Lead = {
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
   ai_allow_quote_override?: number | null;
+  auto_followup_enabled?: number | null;
+  auto_followup_config?: string | null;
   ai_paused?: number | null;
   ai_cooldown_until?: string | null;
   ai_pause_reason?: string | null;
@@ -45,6 +47,70 @@ type TextdripTemplate = {
   category?: string | null;
   is_active?: number | null;
 };
+
+type AutoFollowupRule = {
+  enabled: boolean;
+  delay_minutes: number;
+  message: string;
+};
+
+type AutoFollowupConfig = {
+  quote_missing_info: AutoFollowupRule;
+  quoted_not_booked: AutoFollowupRule;
+  missed_appointment: AutoFollowupRule;
+};
+
+const DEFAULT_AUTO_FOLLOWUP_CONFIG: AutoFollowupConfig = {
+  quote_missing_info: {
+    enabled: true,
+    delay_minutes: 60,
+    message: "Checking in on your quote. Please share ages and genders so I can finish your estimate.",
+  },
+  quoted_not_booked: {
+    enabled: true,
+    delay_minutes: 180,
+    message: "Quick follow-up on your quote range. Do you have time this morning, this afternoon, or this evening for a short call?",
+  },
+  missed_appointment: {
+    enabled: true,
+    delay_minutes: 30,
+    message: "We missed you at your appointment time. Reply with a time window and I will get you rescheduled.",
+  },
+};
+
+const AUTO_FOLLOWUP_RULE_META: Array<{
+  key: keyof AutoFollowupConfig;
+  title: string;
+  description: string;
+}> = [
+  {
+    key: "quote_missing_info",
+    title: "Quote Agreed, Missing Info",
+    description: "Engaged lead agreed to quote but has not shared family size/ages/genders.",
+  },
+  {
+    key: "quoted_not_booked",
+    title: "Quoted, No Appointment",
+    description: "Lead received quote but has not booked an appointment.",
+  },
+  {
+    key: "missed_appointment",
+    title: "Missed Appointment",
+    description: "Lead missed a booked appointment and needs reschedule follow-up.",
+  },
+];
+
+const AUTO_FOLLOWUP_DELAY_OPTIONS = [
+  { value: 15, label: "15 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 120, label: "2 hours" },
+  { value: 180, label: "3 hours" },
+  { value: 360, label: "6 hours" },
+  { value: 720, label: "12 hours" },
+  { value: 1440, label: "24 hours" },
+  { value: 2880, label: "48 hours" },
+];
 
 function formatTime(raw?: string | null) {
   if (!raw) return "";
@@ -92,6 +158,30 @@ function normalizeOptionalBitToBool(value: any): boolean | null {
   if (v === "1" || v === "true") return true;
   if (v === "0" || v === "false") return false;
   return null;
+}
+
+function clampDelayMinutes(value: any, fallback: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.min(7 * 24 * 60, Math.floor(n)));
+}
+
+function normalizeAutoFollowupConfig(input: any): AutoFollowupConfig {
+  const src = input && typeof input === "object" ? input : {};
+  const next: AutoFollowupConfig = {
+    quote_missing_info: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.quote_missing_info },
+    quoted_not_booked: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.quoted_not_booked },
+    missed_appointment: { ...DEFAULT_AUTO_FOLLOWUP_CONFIG.missed_appointment },
+  };
+  (Object.keys(next) as Array<keyof AutoFollowupConfig>).forEach((key) => {
+    const rule: any = src?.[key] || {};
+    next[key] = {
+      enabled: rule?.enabled === undefined ? next[key].enabled : !!rule.enabled,
+      delay_minutes: clampDelayMinutes(rule?.delay_minutes, next[key].delay_minutes),
+      message: String(rule?.message || next[key].message || "").slice(0, 480),
+    };
+  });
+  return next;
 }
 
 function normalizeEmail(input: string) {
@@ -171,6 +261,8 @@ export default function LeadThreadPage() {
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
   const [updatingAi, setUpdatingAi] = React.useState(false);
   const [updatingLeadQuote, setUpdatingLeadQuote] = React.useState(false);
+  const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
+  const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [feedbackBusyId, setFeedbackBusyId] = React.useState<number | null>(null);
@@ -178,6 +270,8 @@ export default function LeadThreadPage() {
   const [googleConnectedEmail, setGoogleConnectedEmail] = React.useState("");
   const [googleGmailConnected, setGoogleGmailConnected] = React.useState(false);
   const [globalAllowQuote, setGlobalAllowQuote] = React.useState(false);
+  const [autoFollowupEnabled, setAutoFollowupEnabled] = React.useState(false);
+  const [autoFollowupConfig, setAutoFollowupConfig] = React.useState<AutoFollowupConfig>(DEFAULT_AUTO_FOLLOWUP_CONFIG);
 
   const [notesDraft, setNotesDraft] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -211,6 +305,15 @@ export default function LeadThreadPage() {
     const found = list.find((x) => String(x.id) === String(leadId)) || null;
 
     setLead(found);
+    if (found) {
+      setAutoFollowupEnabled(Number(found.auto_followup_enabled || 0) === 1);
+      try {
+        const parsed = JSON.parse(String(found.auto_followup_config || "{}"));
+        setAutoFollowupConfig(normalizeAutoFollowupConfig(parsed));
+      } catch {
+        setAutoFollowupConfig(normalizeAutoFollowupConfig({}));
+      }
+    }
 
     if (found && typeof found.notes === "string") {
       setNotesDraft((prev) => (prev === "" ? found.notes || "" : prev));
@@ -575,6 +678,68 @@ export default function LeadThreadPage() {
     }
   }
 
+  async function handleAutoFollowupToggle(nextEnabled: boolean) {
+    if (!leadId) return;
+    try {
+      setUpdatingAutoFollowup(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/auto-followup`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      if (!r.ok) throw new Error("Automatic follow-up toggle failed");
+      const body = await r.json().catch(() => ({}));
+      setAutoFollowupEnabled(!!body?.enabled);
+      setAutoFollowupConfig(normalizeAutoFollowupConfig(body?.config || autoFollowupConfig));
+      setLead((prev) =>
+        prev
+          ? {
+              ...prev,
+              auto_followup_enabled: body?.enabled ? 1 : 0,
+              auto_followup_config: JSON.stringify(normalizeAutoFollowupConfig(body?.config || autoFollowupConfig)),
+            }
+          : prev
+      );
+    } catch {
+      alert("Automatic follow-up toggle failed");
+    } finally {
+      setUpdatingAutoFollowup(false);
+    }
+  }
+
+  async function saveAutoFollowupConfig() {
+    if (!leadId) return;
+    try {
+      setUpdatingAutoFollowup(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/auto-followup`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: autoFollowupEnabled,
+          config: autoFollowupConfig,
+        }),
+      });
+      if (!r.ok) throw new Error("Automatic follow-up save failed");
+      const body = await r.json().catch(() => ({}));
+      setAutoFollowupEnabled(!!body?.enabled);
+      setAutoFollowupConfig(normalizeAutoFollowupConfig(body?.config || autoFollowupConfig));
+      setLead((prev) =>
+        prev
+          ? {
+              ...prev,
+              auto_followup_enabled: body?.enabled ? 1 : 0,
+              auto_followup_config: JSON.stringify(normalizeAutoFollowupConfig(body?.config || autoFollowupConfig)),
+            }
+          : prev
+      );
+      setShowAutoFollowupModal(false);
+    } catch {
+      alert("Automatic follow-up save failed");
+    } finally {
+      setUpdatingAutoFollowup(false);
+    }
+  }
+
   async function handleHotToggle(nextHot: boolean) {
     if (!leadId) return;
     try {
@@ -674,6 +839,7 @@ export default function LeadThreadPage() {
   const quoteOverride = normalizeOptionalBitToBool(lead?.ai_allow_quote_override);
   const quoteEffective = quoteOverride === null ? globalAllowQuote : quoteOverride;
   const quoteFrom = quoteOverride === null ? "Global" : "Lead";
+  const autoFollowupOn = !!autoFollowupEnabled;
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
   const leadCity = String(lead?.city || "").trim();
@@ -683,8 +849,21 @@ export default function LeadThreadPage() {
   const leadLocation = [[leadCity, leadState].filter(Boolean).join(", "), leadZip].filter(Boolean).join(" ").trim();
   const leadLocationLine = [leadLocation, leadTz ? `(${leadTz})` : ""].filter(Boolean).join(" ");
 
+  function updateAutoFollowupRule(
+    key: keyof AutoFollowupConfig,
+    patch: Partial<AutoFollowupRule>
+  ) {
+    setAutoFollowupConfig((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        ...patch,
+      },
+    }));
+  }
+
   return (
-    <div className="mx-auto flex h-[85vh] max-w-[1280px] flex-col rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-6">
+    <div className="mx-auto flex h-[88vh] w-full max-w-[1560px] flex-col rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-6">
       <div className="mb-3 flex items-center gap-3">
         <Link href="/leads" className="text-cyan-400 underline decoration-cyan-500/40">
           ← Back
@@ -745,38 +924,7 @@ export default function LeadThreadPage() {
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <div className="text-sm text-muted-foreground">Status</div>
-            <select
-              value={currentStatus}
-              onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
-              disabled={updatingStatus}
-              className={`border rounded px-2 py-1.5 text-sm ${statusStyle}`}
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={aiOn}
-              disabled={updatingAi}
-              onChange={(e) => handleAiToggle(e.target.checked)}
-            />
-            <span className="text-muted-foreground">AI {aiOn ? "On" : "Off"}</span>
-          </label>
-          <span className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${aiSignal.className}`}>
-            <span aria-hidden="true">
-              {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"}
-            </span>
-            {aiSignal.label}
-          </span>
+        <div className="flex max-w-[440px] flex-wrap items-center justify-end gap-2">
           <span
             className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${
               quoteEffective
@@ -839,7 +987,7 @@ export default function LeadThreadPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-3">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3">
         <aside className="order-2 lg:order-2 min-h-0 overflow-y-auto pr-1 space-y-3">
           <div className="rounded-lg border border-border/70 bg-card/70 p-3 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -916,9 +1064,72 @@ export default function LeadThreadPage() {
               </button>
             </div>
           </div>
+
+          <div className="rounded-lg border border-border/70 bg-card/70 p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-sm font-medium">Automatic Followup</div>
+              <button
+                type="button"
+                onClick={() => handleAutoFollowupToggle(!autoFollowupOn)}
+                disabled={updatingAutoFollowup}
+                className={`rounded border px-3 py-1 text-xs ${
+                  autoFollowupOn
+                    ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                    : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                }`}
+              >
+                {updatingAutoFollowup ? "Saving..." : autoFollowupOn ? "Enabled" : "Disabled"}
+              </button>
+            </div>
+            <div className="mb-2 text-xs text-muted-foreground">
+              Configure per-lead timing and message for quote followups and missed appointments.
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAutoFollowupModal(true)}
+              disabled={updatingAutoFollowup}
+              className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-500/25"
+            >
+              Configure Automatic Followup
+            </button>
+          </div>
         </aside>
 
         <section className="order-1 lg:order-1 min-h-0 flex flex-col">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <div className="text-sm text-muted-foreground">Status</div>
+            <select
+              value={currentStatus}
+              onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
+              disabled={updatingStatus}
+              className={`border rounded px-2 py-1.5 text-sm ${statusStyle}`}
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => handleAiToggle(!aiOn)}
+              disabled={updatingAi}
+              className={`rounded border px-3 py-1.5 text-sm ${
+                aiOn
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                  : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+              }`}
+            >
+              {updatingAi ? "Saving..." : `AI ${aiOn ? "Active" : "Disabled"}`}
+            </button>
+            <span className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${aiSignal.className}`}>
+              <span aria-hidden="true">
+                {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"}
+              </span>
+              {aiSignal.label}
+            </span>
+          </div>
+
           <div className="mb-2 flex gap-2">
             <input
               value={q}
@@ -1090,6 +1301,103 @@ export default function LeadThreadPage() {
           </div>
         </section>
       </div>
+
+      {showAutoFollowupModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-border/80 bg-slate-900 p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-base font-semibold">Automatic Followup</div>
+              <button
+                type="button"
+                onClick={() => setShowAutoFollowupModal(false)}
+                className="rounded border border-border px-3 py-1 text-sm"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mb-3 text-xs text-muted-foreground">
+              Set follow-up message type and delay for each scenario. Messages send exactly as written.
+            </div>
+
+            <div className="space-y-3">
+              {AUTO_FOLLOWUP_RULE_META.map(({ key, title, description }) => {
+                const rule = autoFollowupConfig[key];
+                return (
+                  <div key={key} className="rounded border border-border/70 bg-card/60 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-medium">{title}</div>
+                        <div className="text-xs text-muted-foreground">{description}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateAutoFollowupRule(key, { enabled: !rule.enabled })}
+                        className={`rounded border px-3 py-1 text-xs ${
+                          rule.enabled
+                            ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                            : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                        }`}
+                      >
+                        {rule.enabled ? "Enabled" : "Disabled"}
+                      </button>
+                    </div>
+
+                    <div className="mb-2">
+                      <label className="mb-1 block text-xs text-muted-foreground">Delay</label>
+                      <select
+                        value={rule.delay_minutes}
+                        onChange={(e) =>
+                          updateAutoFollowupRule(key, {
+                            delay_minutes: clampDelayMinutes(e.target.value, rule.delay_minutes),
+                          })
+                        }
+                        className="w-full rounded border px-2 py-2 text-sm"
+                      >
+                        {AUTO_FOLLOWUP_DELAY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted-foreground">Message</label>
+                      <textarea
+                        value={rule.message}
+                        onChange={(e) =>
+                          updateAutoFollowupRule(key, { message: String(e.target.value || "").slice(0, 480) })
+                        }
+                        rows={3}
+                        className="w-full rounded border px-2 py-2 text-sm"
+                        placeholder="Type the exact follow-up message for this scenario"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAutoFollowupModal(false)}
+                className="rounded border border-border px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveAutoFollowupConfig}
+                disabled={updatingAutoFollowup}
+                className="rounded border border-cyan-400/40 bg-cyan-600 px-3 py-2 text-sm text-white hover:bg-cyan-500 disabled:opacity-70"
+              >
+                {updatingAutoFollowup ? "Saving..." : "Save Followup Settings"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -21,12 +21,9 @@ export const metadata: Metadata = {
 const THEME_INIT_SCRIPT = `
 (() => {
   try {
-    const key = "infinitedrip_theme";
-    const stored = localStorage.getItem(key);
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = stored === "dark" || stored === "light" ? stored : (prefersDark ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.classList.add("dark");
+    document.documentElement.setAttribute("data-theme", "dark");
+    localStorage.setItem("infinitedrip_theme", "dark");
   } catch {}
 })();
 `;
