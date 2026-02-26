@@ -11,6 +11,9 @@ type Lead = {
   name?: string | null;
   phone?: string | null;
   status?: LeadStatus | string | null;
+  ai_enabled?: number | null;
+  ai_paused?: number | null;
+  ai_cooldown_until?: string | null;
   createdAt?: string | null;
   created_at?: string | null;
   created?: string | null;
@@ -115,9 +118,45 @@ function renderSourceBadge(v?: string | null) {
   );
 }
 
+type AiSignal = {
+  tone: "green" | "yellow" | "red";
+  label: string;
+  className: string;
+};
+
+function getAiSignal(lead: Lead): AiSignal {
+  const aiEnabled = Number(lead?.ai_enabled ?? 1) === 1;
+  const aiPaused = Number(lead?.ai_paused ?? 0) === 1;
+  const cooldownUntilMs = toDateSafe(String(lead?.ai_cooldown_until || ""));
+  const inCooldown = cooldownUntilMs > Date.now();
+
+  if (!aiEnabled || aiPaused) {
+    return {
+      tone: "red",
+      label: "AI Stopped",
+      className: "border-rose-400/40 bg-rose-500/15 text-rose-300",
+    };
+  }
+  if (inCooldown) {
+    return {
+      tone: "yellow",
+      label: "AI Cooldown",
+      className: "border-amber-400/40 bg-amber-500/15 text-amber-300",
+    };
+  }
+  return {
+    tone: "green",
+    label: "AI Active",
+    className: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+  };
+}
+
 function normalizeLead(raw: any): Lead {
   return {
     ...raw,
+    ai_enabled: Number(raw?.ai_enabled ?? 1),
+    ai_paused: Number(raw?.ai_paused ?? 0),
+    ai_cooldown_until: raw?.ai_cooldown_until ?? null,
     createdAt: raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null,
     lastMessageAt: raw?.lastMessageAt ?? raw?.last_message_at ?? null,
     inboundCount: Number(raw?.inboundCount ?? raw?.inbound_count ?? raw?.inbound ?? 0),
@@ -372,6 +411,7 @@ export default function PipelinePage() {
                   const waiting = l.lastMessageDirection === "in";
                   const hot = isHot(l);
                   const cold = isCold(l);
+                  const aiSignal = getAiSignal(l);
 
                   const cardClass = waiting
                     ? "bg-amber-500/15 border-amber-400/45"
@@ -411,6 +451,9 @@ export default function PipelinePage() {
                                 COLD
                               </span>
                             ) : null}
+                            <span className={`rounded border px-2 py-1 text-[10px] ${aiSignal.className}`}>
+                              {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"} {aiSignal.label}
+                            </span>
 
                             {renderSourceBadge(l.source)}
                             <button

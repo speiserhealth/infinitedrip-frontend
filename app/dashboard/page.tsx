@@ -19,11 +19,37 @@ type ChecklistStep = {
   done: boolean;
 };
 
+type AppointmentWindow = "day" | "week" | "month";
+
+function parseDateSafe(raw?: string | null): Date | null {
+  if (!raw) return null;
+  const str = String(raw || "").trim();
+  if (!str) return null;
+  const iso = str.includes("T") ? str : `${str.replace(" ", "T")}Z`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function isWithinWindow(start: Date | null, window: AppointmentWindow, now = new Date()) {
+  if (!start) return false;
+  const startMs = start.getTime();
+  const nowMs = now.getTime();
+  if (startMs < nowMs) return false;
+
+  const horizon = new Date(now);
+  if (window === "day") horizon.setDate(horizon.getDate() + 1);
+  else if (window === "week") horizon.setDate(horizon.getDate() + 7);
+  else horizon.setDate(horizon.getDate() + 30);
+  return startMs <= horizon.getTime();
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [checklist, setChecklist] = useState<ChecklistStep[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [appointmentWindow, setAppointmentWindow] = useState<AppointmentWindow>("week");
 
   useEffect(() => {
     let dead = false;
@@ -68,6 +94,16 @@ export default function DashboardPage() {
     const pct = Math.round((done / total) * 100);
     return { done, total, pct };
   }, [checklist]);
+
+  const visibleAppointments = useMemo(() => {
+    const rows = [...appointments];
+    rows.sort((a, b) => {
+      const aMs = parseDateSafe(a.start)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bMs = parseDateSafe(b.start)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return aMs - bMs;
+    });
+    return rows.filter((a) => isWithinWindow(parseDateSafe(a.start), appointmentWindow));
+  }, [appointments, appointmentWindow]);
 
   return (
     <main className="rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
@@ -149,14 +185,36 @@ export default function DashboardPage() {
       </section>
 
       <section className="mt-4 rounded-xl border border-border/80 bg-card/70 p-4">
-        <h2 className="text-lg font-medium text-foreground">Upcoming appointments</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-medium text-foreground">Upcoming appointments</h2>
+          <div className="inline-flex items-center gap-1 rounded border border-border/70 bg-background/40 p-1">
+            {([
+              { key: "day", label: "Day" },
+              { key: "week", label: "Week" },
+              { key: "month", label: "Month" },
+            ] as const).map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setAppointmentWindow(tab.key)}
+                className={`rounded px-2 py-1 text-xs ${
+                  appointmentWindow === tab.key
+                    ? "border border-cyan-400/40 bg-cyan-500/15 text-cyan-200"
+                    : "border border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading appointments...</p> : null}
-        {!loading && appointments.length === 0 ? (
+        {!loading && visibleAppointments.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No upcoming appointments.</p>
         ) : null}
-        {!loading && appointments.length > 0 ? (
+        {!loading && visibleAppointments.length > 0 ? (
           <ul className="mt-3 space-y-2">
-            {appointments.map((a) => (
+            {visibleAppointments.map((a) => (
               <li key={a.id} className="rounded border border-border/60 bg-background/40 px-3 py-2">
                 <div className="font-medium text-foreground">{a.title}</div>
                 <div className="text-xs text-muted-foreground">

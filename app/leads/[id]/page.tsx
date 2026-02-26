@@ -18,6 +18,9 @@ type Lead = {
   lead_timezone?: string | null;
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
+  ai_paused?: number | null;
+  ai_cooldown_until?: string | null;
+  ai_pause_reason?: string | null;
   notes?: string | null;
   hot?: number | null;
   archived?: number | null;
@@ -97,6 +100,40 @@ function buildGmailComposeUrl(to: string, subject?: string, authuser?: string) {
   if (authuser) qs.set("authuser", authuser);
   if (subject) qs.set("su", subject);
   return `https://mail.google.com/mail/?${qs.toString()}`;
+}
+
+type AiSignal = {
+  tone: "green" | "yellow" | "red";
+  label: string;
+  className: string;
+};
+
+function getAiSignal(lead: Lead | null): AiSignal {
+  const aiEnabled = Number(lead?.ai_enabled ?? 1) === 1;
+  const aiPaused = Number(lead?.ai_paused ?? 0) === 1;
+  const cooldownAt = String(lead?.ai_cooldown_until || "").trim();
+  const cooldownUntil = cooldownAt ? new Date(cooldownAt) : null;
+  const inCooldown = !!cooldownUntil && !Number.isNaN(cooldownUntil.getTime()) && cooldownUntil.getTime() > Date.now();
+
+  if (!aiEnabled || aiPaused) {
+    return {
+      tone: "red",
+      label: "AI Stopped",
+      className: "border-rose-400/40 bg-rose-500/15 text-rose-300",
+    };
+  }
+  if (inCooldown) {
+    return {
+      tone: "yellow",
+      label: "AI Cooldown",
+      className: "border-amber-400/40 bg-amber-500/15 text-amber-300",
+    };
+  }
+  return {
+    tone: "green",
+    label: "AI Active",
+    className: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+  };
 }
 
 export default function LeadThreadPage() {
@@ -565,6 +602,7 @@ export default function LeadThreadPage() {
   const currentStatus = normalizeStatus(lead?.status);
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
+  const aiSignal = getAiSignal(lead);
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
   const leadCity = String(lead?.city || "").trim();
@@ -662,6 +700,12 @@ export default function LeadThreadPage() {
             />
             <span className="text-muted-foreground">AI {aiOn ? "On" : "Off"}</span>
           </label>
+          <span className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${aiSignal.className}`}>
+            <span aria-hidden="true">
+              {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"}
+            </span>
+            {aiSignal.label}
+          </span>
           <button
             type="button"
             onClick={() => handleHotToggle(!hot)}

@@ -11,6 +11,9 @@ type Lead = {
   name?: string | null;
   phone?: string | null;
   status?: LeadStatus | string | null;
+  ai_enabled?: number | null;
+  ai_paused?: number | null;
+  ai_cooldown_until?: string | null;
   createdAt?: string | null;
   created_at?: string | null;
   created?: string | null;
@@ -116,6 +119,39 @@ function renderSourceBadge(v?: string | null) {
   );
 }
 
+type AiSignal = {
+  tone: "green" | "yellow" | "red";
+  label: string;
+  className: string;
+};
+
+function getAiSignal(lead: Lead): AiSignal {
+  const aiEnabled = Number(lead?.ai_enabled ?? 1) === 1;
+  const aiPaused = Number(lead?.ai_paused ?? 0) === 1;
+  const cooldownUntilMs = toDateSafe(String(lead?.ai_cooldown_until || ""));
+  const inCooldown = cooldownUntilMs > Date.now();
+
+  if (!aiEnabled || aiPaused) {
+    return {
+      tone: "red",
+      label: "Stopped",
+      className: "border-rose-400/40 bg-rose-500/15 text-rose-300",
+    };
+  }
+  if (inCooldown) {
+    return {
+      tone: "yellow",
+      label: "Cooldown",
+      className: "border-amber-400/40 bg-amber-500/15 text-amber-300",
+    };
+  }
+  return {
+    tone: "green",
+    label: "Active",
+    className: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+  };
+}
+
 function normalizeLead(raw: any): Lead {
   const createdAt = raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null;
   const lastMessageAt = raw?.lastMessageAt ?? raw?.last_message_at ?? null;
@@ -123,6 +159,9 @@ function normalizeLead(raw: any): Lead {
 
   return {
     ...raw,
+    ai_enabled: Number(raw?.ai_enabled ?? 1),
+    ai_paused: Number(raw?.ai_paused ?? 0),
+    ai_cooldown_until: raw?.ai_cooldown_until ?? null,
     createdAt,
     lastMessageAt,
     inboundCount: Number(inboundCount ?? 0),
@@ -514,6 +553,7 @@ export default function LeadsPage() {
               <tr>
                 <th className="text-left px-3 py-1.5">Lead</th>
                 <th className="text-left px-3 py-1.5">Status</th>
+                <th className="text-left px-3 py-1.5">AI</th>
                 <th className="text-left px-3 py-1.5">Source</th>
                 <th className="text-left px-3 py-1.5">TZ</th>
                 <th className="text-left px-3 py-1.5">Created</th>
@@ -527,6 +567,7 @@ export default function LeadsPage() {
               {sortedLeads.map((l) => {
                 const st = normalizeStatus(l.status);
                 const cls = STATUS_STYLE[st];
+                const aiSignal = getAiSignal(l);
 
                 const waiting = l.lastMessageDirection === "in";
                 const hot = Number(l.inboundCount ?? 0) >= 3;
@@ -551,6 +592,14 @@ export default function LeadsPage() {
                         {hot ? (
                           <span className="rounded border border-rose-400/40 bg-rose-500/15 px-1 py-0.5 text-[10px] text-rose-200">hot</span>
                         ) : null}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <span className={`inline-flex items-center gap-1 border rounded px-1.5 py-0.5 text-[11px] ${aiSignal.className}`}>
+                        <span aria-hidden="true">
+                          {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"}
+                        </span>
+                        {aiSignal.label}
                       </span>
                     </td>
 
@@ -591,7 +640,7 @@ export default function LeadsPage() {
 
               {sortedLeads.length === 0 ? (
                 <tr className="border-t">
-                  <td className="px-3 py-5 text-sm text-muted-foreground" colSpan={9}>
+                  <td className="px-3 py-5 text-sm text-muted-foreground" colSpan={10}>
                     No leads yet.
                   </td>
                 </tr>
