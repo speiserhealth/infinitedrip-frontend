@@ -699,25 +699,6 @@ export default function LeadThreadPage() {
     }
   }
 
-  async function handleLeadQuoteUseGlobal() {
-    if (!leadId) return;
-    try {
-      setUpdatingLeadQuote(true);
-      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/quote`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ use_default: true }),
-      });
-      if (!r.ok) throw new Error("Quote default reset failed");
-      const updated = await r.json().catch(() => ({}));
-      setLead((prev) => (prev ? { ...prev, ...updated } : prev));
-    } catch {
-      alert("Quote reset failed");
-    } finally {
-      setUpdatingLeadQuote(false);
-    }
-  }
-
   async function handleAutoFollowupToggle(nextEnabled: boolean) {
     if (!leadId) return;
     try {
@@ -884,7 +865,6 @@ export default function LeadThreadPage() {
   const aiSignal = getAiSignal(lead);
   const quoteOverride = normalizeOptionalBitToBool(lead?.ai_allow_quote_override);
   const quoteEffective = quoteOverride === null ? globalAllowQuote : quoteOverride;
-  const quoteFrom = quoteOverride === null ? "Global" : "Lead";
   const autoFollowupOn = !!autoFollowupEnabled;
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
@@ -977,43 +957,6 @@ export default function LeadThreadPage() {
         </div>
 
         <div className="flex max-w-[440px] flex-wrap items-center justify-end gap-2">
-          <span
-            className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${
-              quoteEffective
-                ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
-                : "border-rose-400/40 bg-rose-500/15 text-rose-300"
-            }`}
-          >
-            💬 Quote {quoteEffective ? "Enabled" : "Disabled"} ({quoteFrom})
-          </span>
-          <button
-            type="button"
-            onClick={handleLeadQuoteToggle}
-            disabled={updatingLeadQuote}
-            className={`rounded border px-2 py-1 text-sm ${
-              quoteEffective
-                ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
-                : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
-            }`}
-            title="Enable/disable quote mode for this specific lead"
-          >
-            {updatingLeadQuote
-              ? "Saving..."
-              : quoteEffective
-                ? "Disable Quote (Lead)"
-                : "Enable Quote (Lead)"}
-          </button>
-          {quoteOverride !== null ? (
-            <button
-              type="button"
-              onClick={handleLeadQuoteUseGlobal}
-              disabled={updatingLeadQuote}
-              className="rounded border border-border bg-card/70 px-2 py-1 text-sm text-muted-foreground"
-              title="Clear per-lead override and use global quote mode"
-            >
-              Use Global Quote Mode
-            </button>
-          ) : null}
           <button
             type="button"
             onClick={() => handleHotToggle(!hot)}
@@ -1178,6 +1121,19 @@ export default function LeadThreadPage() {
               }`}
             >
               {updatingAi ? "Saving..." : `AI ${aiOn ? "Active" : "Disabled"}`}
+            </button>
+            <button
+              type="button"
+              onClick={handleLeadQuoteToggle}
+              disabled={updatingLeadQuote}
+              className={`rounded border px-3 py-1.5 text-sm ${
+                quoteEffective
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                  : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+              }`}
+              title="Enable/disable quote mode for this lead"
+            >
+              {updatingLeadQuote ? "Saving..." : `$ QUOTE ${quoteEffective ? "ENABLED" : "DISABLED"}`}
             </button>
             <span className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${aiSignal.className}`}>
               <span aria-hidden="true">
