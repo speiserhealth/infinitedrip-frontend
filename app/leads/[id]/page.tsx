@@ -234,12 +234,23 @@ type AiSignal = {
   className: string;
 };
 
-function getAiSignal(lead: Lead | null): AiSignal {
+function formatCooldownCountdown(remainingMs: number) {
+  const totalSec = Math.max(0, Math.ceil(remainingMs / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return `${min}m ${String(sec).padStart(2, "0")}s`;
+  return `${sec}s`;
+}
+
+function getAiSignal(lead: Lead | null, nowMs = Date.now()): AiSignal {
   const aiEnabled = Number(lead?.ai_enabled ?? 1) === 1;
   const aiPaused = Number(lead?.ai_paused ?? 0) === 1;
   const cooldownAt = String(lead?.ai_cooldown_until || "").trim();
   const cooldownUntil = cooldownAt ? new Date(cooldownAt) : null;
-  const inCooldown = !!cooldownUntil && !Number.isNaN(cooldownUntil.getTime()) && cooldownUntil.getTime() > Date.now();
+  const cooldownUntilMs = !!cooldownUntil && !Number.isNaN(cooldownUntil.getTime())
+    ? cooldownUntil.getTime()
+    : 0;
+  const inCooldown = cooldownUntilMs > nowMs;
 
   if (!aiEnabled || aiPaused) {
     return {
@@ -251,7 +262,7 @@ function getAiSignal(lead: Lead | null): AiSignal {
   if (inCooldown) {
     return {
       tone: "yellow",
-      label: "AI Cooldown",
+      label: `AI Cooldown ${formatCooldownCountdown(cooldownUntilMs - nowMs)}`,
       className: "border-amber-400/40 bg-amber-500/15 text-amber-300",
     };
   }
@@ -274,6 +285,7 @@ export default function LeadThreadPage() {
   const [lead, setLead] = React.useState<Lead | null>(null);
   const [messages, setMessages] = React.useState<Msg[]>([]);
   const [error, setError] = React.useState("");
+  const [nowMs, setNowMs] = React.useState<number>(() => Date.now());
 
   const [newMessage, setNewMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -319,6 +331,11 @@ export default function LeadThreadPage() {
   const lastHistorySyncAtRef = React.useRef(0);
   const historySyncInFlightRef = React.useRef(false);
   const threadLoadInFlightRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   async function loadTemplates() {
     const r = await apiFetch(`${API_BASE}/api/textdrip/templates`, { cache: "no-store" });
@@ -910,7 +927,10 @@ export default function LeadThreadPage() {
   const currentStatus = normalizeStatus(lead?.status);
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
-  const aiSignal = getAiSignal(lead);
+  const aiSignal = React.useMemo(() => getAiSignal(lead, nowMs), [lead, nowMs]);
+  const aiCooldownCountdown = aiSignal.tone === "yellow"
+    ? String(aiSignal.label || "").replace(/^AI Cooldown\s*/, "")
+    : "";
   const quoteOverride = normalizeOptionalBitToBool(lead?.ai_allow_quote_override);
   const quoteEffective = quoteOverride === null ? globalAllowQuote : quoteOverride;
   const autoFollowupOn = !!autoFollowupEnabled;
@@ -1168,7 +1188,11 @@ export default function LeadThreadPage() {
                   : "border-rose-400/40 bg-rose-500/15 text-rose-200"
               }`}
             >
-              {updatingAi ? "Saving..." : `AI ${aiOn ? "Enabled" : "Disabled"}`}
+              {updatingAi
+                ? "Saving..."
+                : aiOn
+                  ? (aiCooldownCountdown ? `AI Enabled (${aiCooldownCountdown})` : "AI Enabled")
+                  : "AI Disabled"}
             </button>
             <button
               type="button"

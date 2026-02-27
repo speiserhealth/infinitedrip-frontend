@@ -124,11 +124,19 @@ type AiSignal = {
   className: string;
 };
 
-function getAiSignal(lead: Lead): AiSignal {
+function formatCooldownCountdown(remainingMs: number) {
+  const totalSec = Math.max(0, Math.ceil(remainingMs / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return `${min}m ${String(sec).padStart(2, "0")}s`;
+  return `${sec}s`;
+}
+
+function getAiSignal(lead: Lead, nowMs = Date.now()): AiSignal {
   const aiEnabled = Number(lead?.ai_enabled ?? 1) === 1;
   const aiPaused = Number(lead?.ai_paused ?? 0) === 1;
   const cooldownUntilMs = toDateSafe(String(lead?.ai_cooldown_until || ""));
-  const inCooldown = cooldownUntilMs > Date.now();
+  const inCooldown = cooldownUntilMs > nowMs;
 
   if (!aiEnabled || aiPaused) {
     return {
@@ -140,7 +148,7 @@ function getAiSignal(lead: Lead): AiSignal {
   if (inCooldown) {
     return {
       tone: "yellow",
-      label: "AI Cooldown",
+      label: `AI Cooldown ${formatCooldownCountdown(cooldownUntilMs - nowMs)}`,
       className: "border-amber-400/40 bg-amber-500/15 text-amber-300",
     };
   }
@@ -176,6 +184,7 @@ export default function PipelinePage() {
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [nowMs, setNowMs] = React.useState<number>(() => Date.now());
   const [sort, setSort] = React.useState<SortKey>("newest");
   const [columnRange, setColumnRange] = React.useState<Record<LeadStatus, RangeKey>>({
     engaged: "30",
@@ -187,6 +196,11 @@ export default function PipelinePage() {
 
   const dragLeadIdRef = React.useRef<number | null>(null);
   const [dragOver, setDragOver] = React.useState<LeadStatus | null>(null);
+
+  React.useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   async function loadLeads() {
     const r = await apiFetch(`${API_BASE}/api/leads`, { cache: "no-store" });
@@ -411,7 +425,7 @@ export default function PipelinePage() {
                   const waiting = l.lastMessageDirection === "in";
                   const hot = isHot(l);
                   const cold = isCold(l);
-                  const aiSignal = getAiSignal(l);
+                  const aiSignal = getAiSignal(l, nowMs);
 
                   const cardClass = waiting
                     ? "bg-amber-500/15 border-amber-400/45"
