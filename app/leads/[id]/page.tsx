@@ -41,14 +41,6 @@ type Msg = {
   ai_feedback_negative?: number | null;
 };
 
-type TextdripTemplate = {
-  template_id: string;
-  name?: string | null;
-  body?: string | null;
-  category?: string | null;
-  is_active?: number | null;
-};
-
 type AutoFollowupRule = {
   enabled: boolean;
   delay_minutes: number;
@@ -292,9 +284,6 @@ export default function LeadThreadPage() {
   const [uploadingImage, setUploadingImage] = React.useState(false);
   const [mediaUrl, setMediaUrl] = React.useState("");
   const [showEmoji, setShowEmoji] = React.useState(false);
-  const [templates, setTemplates] = React.useState<TextdripTemplate[]>([]);
-  const [templateChoice, setTemplateChoice] = React.useState("");
-  const [syncingTemplates, setSyncingTemplates] = React.useState(false);
 
   const [q, setQ] = React.useState("");
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
@@ -336,14 +325,6 @@ export default function LeadThreadPage() {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
-
-  async function loadTemplates() {
-    const r = await apiFetch(`${API_BASE}/api/textdrip/templates`, { cache: "no-store" });
-    if (!r.ok) return;
-    const data = await r.json().catch(() => ({}));
-    const list = Array.isArray(data?.templates) ? data.templates : [];
-    setTemplates(list);
-  }
 
   async function loadThread() {
     if (!leadId) return;
@@ -486,10 +467,6 @@ export default function LeadThreadPage() {
   }, [API_BASE]);
 
   React.useEffect(() => {
-    loadTemplates().catch(() => {});
-  }, [API_BASE]);
-
-  React.useEffect(() => {
     const el = threadScrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
@@ -498,25 +475,6 @@ export default function LeadThreadPage() {
   function insertEmoji(value: string) {
     setNewMessage((prev) => `${prev}${value}`);
     setShowEmoji(false);
-  }
-
-  function applySelectedTemplate() {
-    const t = templates.find((x) => String(x.template_id) === templateChoice);
-    if (!t) return;
-    setNewMessage(String(t.body || ""));
-  }
-
-  async function syncTemplates() {
-    try {
-      setSyncingTemplates(true);
-      const r = await apiFetch(`${API_BASE}/api/textdrip/templates/sync`, { method: "POST" });
-      if (!r.ok) throw new Error("Template sync failed");
-      await loadTemplates();
-    } catch {
-      alert("Template sync failed");
-    } finally {
-      setSyncingTemplates(false);
-    }
   }
 
   function openImagePicker() {
@@ -1306,36 +1264,6 @@ export default function LeadThreadPage() {
           </div>
 
           <div className="border-t pt-3">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <select
-                value={templateChoice}
-                onChange={(e) => setTemplateChoice(e.target.value)}
-                className="border rounded px-2 py-1 text-sm"
-              >
-                <option value="">Textdrip templates...</option>
-                {templates.map((t) => (
-                  <option key={t.template_id} value={t.template_id}>
-                    {t.name || t.template_id}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={applySelectedTemplate}
-                disabled={!templateChoice}
-                className="border rounded px-2 py-1 text-xs"
-              >
-                Use Template
-              </button>
-              <button
-                type="button"
-                onClick={() => syncTemplates().catch(() => {})}
-                disabled={syncingTemplates}
-                className="border rounded px-2 py-1 text-xs"
-              >
-                {syncingTemplates ? "Syncing..." : "Sync Templates"}
-              </button>
-            </div>
             {mediaUrl ? (
               <div className="mb-2 rounded border border-border/70 p-2 flex items-center justify-between gap-3">
                 <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-sm text-cyan-400 underline truncate">
