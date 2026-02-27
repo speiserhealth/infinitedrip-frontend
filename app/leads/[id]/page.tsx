@@ -19,6 +19,7 @@ type Lead = {
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
   ai_allow_quote_override?: number | null;
+  ai_allow_aca_override?: number | null;
   auto_followup_enabled?: number | null;
   auto_followup_config?: string | null;
   ai_paused?: number | null;
@@ -290,6 +291,7 @@ export default function LeadThreadPage() {
   const [updatingAi, setUpdatingAi] = React.useState(false);
   const [resumingAi, setResumingAi] = React.useState(false);
   const [updatingLeadQuote, setUpdatingLeadQuote] = React.useState(false);
+  const [updatingLeadAca, setUpdatingLeadAca] = React.useState(false);
   const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
   const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
   const [autoFollowupDraftDirty, setAutoFollowupDraftDirty] = React.useState(false);
@@ -722,6 +724,27 @@ export default function LeadThreadPage() {
     }
   }
 
+  async function handleLeadAcaToggle() {
+    if (!leadId) return;
+    const override = normalizeOptionalBitToBool(lead?.ai_allow_aca_override);
+    const effective = override === null ? true : override;
+    try {
+      setUpdatingLeadAca(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/aca`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !effective }),
+      });
+      if (!r.ok) throw new Error("ACA toggle failed");
+      const updated = await r.json().catch(() => ({}));
+      setLead((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch {
+      alert("ACA toggle failed");
+    } finally {
+      setUpdatingLeadAca(false);
+    }
+  }
+
   async function handleAutoFollowupToggle(nextEnabled: boolean) {
     if (!leadId) return;
     try {
@@ -891,6 +914,8 @@ export default function LeadThreadPage() {
     : "";
   const quoteOverride = normalizeOptionalBitToBool(lead?.ai_allow_quote_override);
   const quoteEffective = quoteOverride === null ? globalAllowQuote : quoteOverride;
+  const acaOverride = normalizeOptionalBitToBool(lead?.ai_allow_aca_override);
+  const acaEffective = acaOverride === null ? true : acaOverride;
   const autoFollowupOn = !!autoFollowupEnabled;
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
@@ -1173,6 +1198,19 @@ export default function LeadThreadPage() {
               title="Enable/disable quote mode for this lead"
             >
               {updatingLeadQuote ? "Saving..." : `$ QUOTE ${quoteEffective ? "ENABLED" : "DISABLED"}`}
+            </button>
+            <button
+              type="button"
+              onClick={handleLeadAcaToggle}
+              disabled={updatingLeadAca}
+              className={`rounded border px-3 py-1.5 text-sm ${
+                acaEffective
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                  : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+              }`}
+              title="Enable/disable ACA subsidy branch for this lead"
+            >
+              {updatingLeadAca ? "Saving..." : `ACA ${acaEffective ? "ENABLED" : "DISABLED"}`}
             </button>
             <span className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs ${aiSignal.className}`}>
               <span aria-hidden="true">
