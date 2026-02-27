@@ -58,7 +58,7 @@ export default function Sidebar() {
   return (
     <aside className="relative z-10 flex w-64 flex-col border-r border-sky-300/25 bg-slate-900/85 p-4 text-slate-100 shadow-[0_0_30px_rgba(56,189,248,0.10)] backdrop-blur-md">
       <div className="mb-6">
-        <div className="text-2xl font-extrabold tracking-[0.12em] text-cyan-300 drop-shadow-[0_0_24px_rgba(56,189,248,0.72)]">
+        <div className="text-3xl font-extrabold tracking-[0.12em] text-cyan-300 drop-shadow-[0_0_24px_rgba(56,189,248,0.72)]">
           INFINITE DRIP
         </div>
       </div>
@@ -71,7 +71,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={[
-                "block rounded px-3 py-2 text-sm",
+                "block rounded px-3 py-2.5 text-base font-medium",
                 active
                   ? "bg-cyan-600/85 text-white shadow-[0_0_14px_rgba(56,189,248,0.45)]"
                   : "text-cyan-100 hover:bg-slate-800/75 hover:text-white",
@@ -86,7 +86,7 @@ export default function Sidebar() {
       <Link
         href={billingNavItem.href}
         className={[
-          "mb-3 block rounded px-3 py-2 text-sm",
+          "mb-3 block rounded px-3 py-2.5 text-base font-medium",
           pathname === billingNavItem.href
             ? "bg-cyan-600/85 text-white shadow-[0_0_14px_rgba(56,189,248,0.45)]"
             : "text-cyan-100 hover:bg-slate-800/75 hover:text-white",
