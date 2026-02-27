@@ -28,6 +28,7 @@ type Lead = {
   notes?: string | null;
   hot?: number | null;
   archived?: number | null;
+  dnc?: number | null;
 };
 
 type Msg = {
@@ -298,6 +299,7 @@ export default function LeadThreadPage() {
   const [autoFollowupDraft, setAutoFollowupDraft] = React.useState<AutoFollowupConfig | null>(null);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
+  const [updatingDnc, setUpdatingDnc] = React.useState(false);
   const [feedbackBusyKey, setFeedbackBusyKey] = React.useState<string | null>(null);
   const [contactEmail, setContactEmail] = React.useState("");
   const [googleConnectedEmail, setGoogleConnectedEmail] = React.useState("");
@@ -511,6 +513,10 @@ export default function LeadThreadPage() {
 
   async function handleSend() {
     if ((!newMessage.trim() && !mediaUrl) || !leadId) return;
+    if (Number(lead?.dnc ?? 0) === 1) {
+      alert("DNC is enabled for this lead. Sending is disabled.");
+      return;
+    }
 
     try {
       setSending(true);
@@ -849,6 +855,24 @@ export default function LeadThreadPage() {
     }
   }
 
+  async function handleDncToggle(nextDnc: boolean) {
+    if (!leadId) return;
+    try {
+      setUpdatingDnc(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/dnc`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextDnc }),
+      });
+      if (!r.ok) throw new Error("DNC toggle failed");
+      await loadThread();
+    } catch {
+      alert("DNC toggle failed");
+    } finally {
+      setUpdatingDnc(false);
+    }
+  }
+
   async function saveNotes() {
     if (!leadId) return;
 
@@ -919,6 +943,7 @@ export default function LeadThreadPage() {
   const autoFollowupOn = !!autoFollowupEnabled;
   const hot = Number(lead?.hot ?? 0) === 1;
   const archived = Number(lead?.archived ?? 0) === 1;
+  const dnc = Number(lead?.dnc ?? 0) === 1;
   const leadCity = String(lead?.city || "").trim();
   const leadState = String(lead?.state || "").trim();
   const leadZip = String(lead?.zip || "").trim();
@@ -1035,6 +1060,27 @@ export default function LeadThreadPage() {
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3">
         <aside className="order-2 lg:order-2 min-h-0 overflow-y-auto pr-1 space-y-3">
+          <div className="rounded-lg border border-rose-400/40 bg-rose-500/10 p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-medium text-rose-200">Do Not Contact</div>
+              <button
+                type="button"
+                onClick={() => handleDncToggle(!dnc)}
+                disabled={updatingDnc}
+                className={`rounded border px-3 py-1 text-xs ${
+                  dnc
+                    ? "border-rose-400/50 bg-rose-600/25 text-rose-100"
+                    : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                }`}
+              >
+                {updatingDnc ? "Saving..." : dnc ? "DNC ENABLED" : "DNC DISABLED"}
+              </button>
+            </div>
+            <div className="text-xs text-rose-200/90">
+              When enabled, message sending is locked for this lead.
+            </div>
+          </div>
+
           <div className="rounded-lg border border-border/70 bg-card/70 p-3 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium">Notes</div>
@@ -1336,10 +1382,16 @@ export default function LeadThreadPage() {
               <textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder={mediaUrl ? "Optional caption..." : "Type a message..."}
+                placeholder={dnc ? "DNC enabled - messaging disabled" : (mediaUrl ? "Optional caption..." : "Type a message...")}
                 rows={2}
-                className="flex-1 border rounded px-3 py-2 resize-y"
+                disabled={dnc}
+                className={`flex-1 border rounded px-3 py-2 resize-y ${
+                  dnc
+                    ? "border-rose-400/60 bg-rose-500/10 text-rose-100 placeholder:text-rose-200/70"
+                    : ""
+                }`}
                 onKeyDown={(e) => {
+                  if (dnc) return;
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     if (!sending) handleSend();
@@ -1358,7 +1410,7 @@ export default function LeadThreadPage() {
               <button
                 type="button"
                 onClick={openImagePicker}
-                disabled={uploadingImage || sending}
+                disabled={dnc || uploadingImage || sending}
                 className="border px-3 py-2 rounded"
                 title="Upload image"
               >
@@ -1368,14 +1420,20 @@ export default function LeadThreadPage() {
               <button
                 type="button"
                 onClick={() => setShowEmoji((v) => !v)}
-                disabled={sending}
+                disabled={dnc || sending}
                 className="border px-3 py-2 rounded"
                 title="Emoji"
               >
                 😊
               </button>
 
-              <button onClick={handleSend} disabled={sending || (!newMessage.trim() && !mediaUrl)} className="bg-cyan-600 text-white px-4 py-2 rounded">
+              <button
+                onClick={handleSend}
+                disabled={dnc || sending || (!newMessage.trim() && !mediaUrl)}
+                className={`px-4 py-2 rounded text-white ${
+                  dnc ? "bg-rose-700/70 cursor-not-allowed" : "bg-cyan-600"
+                }`}
+              >
                 {sending ? "..." : "Send"}
               </button>
             </div>

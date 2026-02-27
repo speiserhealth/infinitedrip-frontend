@@ -659,9 +659,9 @@ export default function LeadsPage() {
           {sortedLeads.length} lead{sortedLeads.length === 1 ? "" : "s"}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[62vh] overflow-auto">
           <table className="min-w-[1220px] w-full text-xs md:text-sm">
-            <thead className="bg-muted/40 text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-1.5">Lead</th>
                 <th className="text-left px-3 py-1.5">Status</th>
