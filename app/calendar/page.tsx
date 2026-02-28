@@ -12,7 +12,7 @@ type Appointment = {
   link: string | null;
 };
 
-type AppointmentWindow = "day" | "week" | "month";
+type CalendarView = "day" | "week" | "month";
 
 type CalendarStatus = {
   configured?: boolean;
@@ -34,6 +34,8 @@ type SettingsResponse = {
   };
 };
 
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 function parseDateSafe(raw?: string | null): Date | null {
   if (!raw) return null;
   const str = String(raw || "").trim();
@@ -44,24 +46,137 @@ function parseDateSafe(raw?: string | null): Date | null {
   return d;
 }
 
-function isWithinWindow(start: Date | null, window: AppointmentWindow, now = new Date()) {
-  if (!start) return false;
-  const startMs = start.getTime();
-  const nowMs = now.getTime();
-  if (startMs < nowMs) return false;
+function startOfDay(d: Date): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
 
-  const horizon = new Date(now);
-  if (window === "day") horizon.setDate(horizon.getDate() + 1);
-  else if (window === "week") horizon.setDate(horizon.getDate() + 7);
-  else horizon.setDate(horizon.getDate() + 30);
-  return startMs <= horizon.getTime();
+function endOfDay(d: Date): Date {
+  const out = new Date(d);
+  out.setHours(23, 59, 59, 999);
+  return out;
+}
+
+function addDays(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  return out;
+}
+
+function addMonths(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setMonth(out.getMonth() + n);
+  return out;
+}
+
+function startOfWeek(d: Date): Date {
+  const base = startOfDay(d);
+  return addDays(base, -base.getDay());
+}
+
+function endOfWeek(d: Date): Date {
+  return endOfDay(addDays(startOfWeek(d), 6));
+}
+
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+
+function endOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function toDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDateHeading(d: Date): string {
+  return d.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatRangeLabel(view: CalendarView, anchor: Date): string {
+  if (view === "month") {
+    return anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  }
+  if (view === "week") {
+    const s = startOfWeek(anchor);
+    const e = addDays(s, 6);
+    const startLabel = s.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const endLabel = e.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    return `${startLabel} - ${endLabel}`;
+  }
+  return anchor.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+}
+
+function getVisibleRange(view: CalendarView, anchor: Date): { start: Date; end: Date } {
+  if (view === "day") {
+    return { start: startOfDay(anchor), end: endOfDay(anchor) };
+  }
+  if (view === "week") {
+    const start = startOfWeek(anchor);
+    const end = endOfWeek(anchor);
+    return { start, end };
+  }
+  const monthStart = startOfMonth(anchor);
+  const monthEnd = endOfMonth(anchor);
+  return { start: startOfWeek(monthStart), end: endOfWeek(monthEnd) };
+}
+
+function formatEventTimeRange(a: Appointment): string {
+  const start = parseDateSafe(a.start);
+  const end = parseDateSafe(a.end);
+  if (!start) return "No time";
+  const s = start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (!end) return s;
+  const e = end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${s} - ${e}`;
+}
+
+function sortEvents(items: Appointment[]): Appointment[] {
+  return [...items].sort((a, b) => {
+    const aMs = parseDateSafe(a.start)?.getTime() || 0;
+    const bMs = parseDateSafe(b.start)?.getTime() || 0;
+    return aMs - bMs;
+  });
+}
+
+function groupEventsByDay(items: Appointment[]): Map<string, Appointment[]> {
+  const map = new Map<string, Appointment[]>();
+  for (const item of sortEvents(items)) {
+    const start = parseDateSafe(item.start);
+    if (!start) continue;
+    const key = toDayKey(start);
+    const bucket = map.get(key) || [];
+    bucket.push(item);
+    map.set(key, bucket);
+  }
+  return map;
 }
 
 export default function CalendarPage() {
-  const [loading, setLoading] = React.useState(true);
+  const [loadingEvents, setLoadingEvents] = React.useState(true);
   const [savingRules, setSavingRules] = React.useState(false);
   const [events, setEvents] = React.useState<Appointment[]>([]);
-  const [windowSize, setWindowSize] = React.useState<AppointmentWindow>("week");
+  const [view, setView] = React.useState<CalendarView>("month");
+  const [anchorDate, setAnchorDate] = React.useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = React.useState<Date>(() => new Date());
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState("");
 
@@ -73,15 +188,30 @@ export default function CalendarPage() {
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [connectingGoogle, setConnectingGoogle] = React.useState(false);
 
-  const visibleEvents = React.useMemo(() => {
-    const rows = [...events];
-    rows.sort((a, b) => {
-      const aMs = parseDateSafe(a.start)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const bMs = parseDateSafe(b.start)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      return aMs - bMs;
-    });
-    return rows.filter((a) => isWithinWindow(parseDateSafe(a.start), windowSize));
-  }, [events, windowSize]);
+  const visibleRange = React.useMemo(() => getVisibleRange(view, anchorDate), [view, anchorDate]);
+  const eventsByDay = React.useMemo(() => groupEventsByDay(events), [events]);
+
+  const selectedDayEvents = React.useMemo(() => {
+    return sortEvents(eventsByDay.get(toDayKey(startOfDay(selectedDate))) || []);
+  }, [eventsByDay, selectedDate]);
+
+  const monthCells = React.useMemo(() => {
+    if (view !== "month") return [] as Date[];
+    const out: Date[] = [];
+    let cursor = new Date(visibleRange.start);
+    while (cursor.getTime() <= visibleRange.end.getTime()) {
+      out.push(new Date(cursor));
+      cursor = addDays(cursor, 1);
+    }
+    return out;
+  }, [view, visibleRange]);
+
+  const weekDays = React.useMemo(() => {
+    if (view !== "week") return [] as Date[];
+    const out: Date[] = [];
+    for (let i = 0; i < 7; i += 1) out.push(addDays(startOfWeek(anchorDate), i));
+    return out;
+  }, [view, anchorDate]);
 
   const loadStatus = React.useCallback(async () => {
     setStatusLoading(true);
@@ -96,43 +226,53 @@ export default function CalendarPage() {
     }
   }, []);
 
-  const loadAll = React.useCallback(async () => {
-    setLoading(true);
+  const loadSettings = React.useCallback(async () => {
+    const settingsRes = await apiFetch("/api/settings", { cache: "no-store" });
+    if (!settingsRes.ok) {
+      const txt = await settingsRes.text().catch(() => "");
+      throw new Error(`Calendar settings load failed (${settingsRes.status}): ${txt}`);
+    }
+    const settingsBody = (await settingsRes.json().catch(() => ({}))) as SettingsResponse;
+    const settings = settingsBody?.settings || {};
+    setMaxConcurrent(String(settings.calendar_max_concurrent_bookings || 1));
+    setOverlapWindow(String(settings.calendar_overlap_window_minutes || 30));
+  }, []);
+
+  const loadEvents = React.useCallback(async () => {
+    setLoadingEvents(true);
     setError("");
     try {
-      const [apptRes, settingsRes] = await Promise.all([
-        apiFetch("/api/appointments", { cache: "no-store" }),
-        apiFetch("/api/settings", { cache: "no-store" }),
-      ]);
-
+      const params = new URLSearchParams({
+        timeMin: visibleRange.start.toISOString(),
+        timeMax: visibleRange.end.toISOString(),
+        maxResults: "500",
+      });
+      const apptRes = await apiFetch(`/api/appointments?${params.toString()}`, { cache: "no-store" });
       if (!apptRes.ok) {
         const txt = await apptRes.text().catch(() => "");
         throw new Error(`Appointments load failed (${apptRes.status}): ${txt}`);
       }
-      if (!settingsRes.ok) {
-        const txt = await settingsRes.text().catch(() => "");
-        throw new Error(`Calendar settings load failed (${settingsRes.status}): ${txt}`);
-      }
-
       const apptBody = await apptRes.json().catch(() => ({}));
-      const settingsBody = (await settingsRes.json().catch(() => ({}))) as SettingsResponse;
-
       setEvents(Array.isArray(apptBody?.events) ? apptBody.events : []);
-      const settings = settingsBody?.settings || {};
-      setMaxConcurrent(String(settings.calendar_max_concurrent_bookings || 1));
-      setOverlapWindow(String(settings.calendar_overlap_window_minutes || 30));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e || "Failed loading calendar");
+      const msg = e instanceof Error ? e.message : String(e || "Failed loading calendar events");
       setError(msg);
     } finally {
-      setLoading(false);
+      setLoadingEvents(false);
     }
-  }, []);
+  }, [visibleRange]);
 
   React.useEffect(() => {
-    loadAll();
+    loadSettings().catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e || "Failed loading calendar settings");
+      setError(msg);
+    });
     loadStatus();
-  }, [loadAll, loadStatus]);
+  }, [loadSettings, loadStatus]);
+
+  React.useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   async function saveRules() {
     setSavingRules(true);
@@ -178,13 +318,33 @@ export default function CalendarPage() {
     }
   }
 
+  function shiftWindow(delta: number) {
+    setSuccess("");
+    setAnchorDate((prev) => {
+      if (view === "day") return addDays(prev, delta);
+      if (view === "week") return addDays(prev, delta * 7);
+      return addMonths(prev, delta);
+    });
+    setSelectedDate((prev) => {
+      if (view === "day") return addDays(prev, delta);
+      if (view === "week") return addDays(prev, delta * 7);
+      return addMonths(prev, delta);
+    });
+  }
+
+  function setToday() {
+    const now = new Date();
+    setAnchorDate(now);
+    setSelectedDate(now);
+  }
+
   return (
     <main className="rounded-2xl border border-border/70 bg-card/40 p-6 shadow-xl backdrop-blur-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Calendar</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage appointments, booking capacity, and overlap rules per user.
+            Day/week/month calendar with per-user booking controls.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -197,10 +357,10 @@ export default function CalendarPage() {
           </button>
           <button
             type="button"
-            onClick={loadAll}
+            onClick={loadEvents}
             className="rounded border border-border bg-card px-3 py-2 text-sm text-foreground hover:bg-muted"
           >
-            Refresh
+            Refresh events
           </button>
         </div>
       </div>
@@ -209,54 +369,7 @@ export default function CalendarPage() {
       {success ? <div className="mt-4 rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{success}</div> : null}
 
       <section className="mt-6 rounded-xl border border-border/80 bg-card/70 p-4">
-        <h2 className="text-lg font-medium text-foreground">Booking rules</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Set how many appointments you allow in the same time window.
-        </p>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <label className="rounded border border-border/70 bg-background/40 p-3 text-sm">
-            <div className="text-xs text-muted-foreground">Booking capacity</div>
-            <select
-              value={maxConcurrent}
-              onChange={(e) => setMaxConcurrent(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
-            >
-              <option value="1">Single booking</option>
-              <option value="2">Double booking</option>
-              <option value="3">Triple booking</option>
-            </select>
-          </label>
-
-          <label className="rounded border border-border/70 bg-background/40 p-3 text-sm">
-            <div className="text-xs text-muted-foreground">Overlap window</div>
-            <select
-              value={overlapWindow}
-              onChange={(e) => setOverlapWindow(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
-            >
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">60 minutes</option>
-            </select>
-          </label>
-
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={saveRules}
-              disabled={savingRules}
-              className="w-full rounded border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
-            >
-              {savingRules ? "Saving..." : "Save calendar rules"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-4 rounded-xl border border-border/80 bg-card/70 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-medium text-foreground">Upcoming appointments</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="inline-flex items-center gap-1 rounded border border-border/70 bg-background/40 p-1">
             {([
               { key: "day", label: "Day" },
@@ -266,9 +379,9 @@ export default function CalendarPage() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setWindowSize(tab.key)}
+                onClick={() => setView(tab.key)}
                 className={`rounded px-2 py-1 text-xs ${
-                  windowSize === tab.key
+                  view === tab.key
                     ? "border border-cyan-400/40 bg-cyan-500/15 text-cyan-200"
                     : "border border-transparent text-muted-foreground hover:text-foreground"
                 }`}
@@ -277,32 +390,207 @@ export default function CalendarPage() {
               </button>
             ))}
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => shiftWindow(-1)}
+              className="rounded border border-border bg-card px-3 py-2 text-xs text-foreground hover:bg-muted"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              onClick={setToday}
+              className="rounded border border-border bg-card px-3 py-2 text-xs text-foreground hover:bg-muted"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => shiftWindow(1)}
+              className="rounded border border-border bg-card px-3 py-2 text-xs text-foreground hover:bg-muted"
+            >
+              Next
+            </button>
+          </div>
         </div>
 
-        {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading appointments...</p> : null}
-        {!loading && visibleEvents.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">No upcoming appointments in this window.</p>
-        ) : null}
-        {!loading && visibleEvents.length > 0 ? (
-          <ul className="mt-3 space-y-2">
-            {visibleEvents.map((a) => (
-              <li key={a.id} className="rounded border border-border/60 bg-background/40 px-3 py-2">
-                <div className="font-medium text-foreground">{a.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {a.start || "no start"} to {a.end || "no end"}
-                  {a.link ? (
-                    <>
-                      {" "}•{" "}
-                      <a className="text-cyan-400 underline decoration-cyan-500/40" href={a.link} target="_blank" rel="noreferrer">
-                        open event
-                      </a>
-                    </>
-                  ) : null}
+        <div className="mt-3 text-sm font-medium text-cyan-200">{formatRangeLabel(view, anchorDate)}</div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[2.5fr_1fr]">
+          <div className="rounded border border-border/70 bg-background/30 p-3">
+            {loadingEvents ? <p className="text-sm text-muted-foreground">Loading events...</p> : null}
+
+            {!loadingEvents && view === "month" ? (
+              <>
+                <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground">
+                  {WEEKDAY_LABELS.map((d) => (
+                    <div key={d} className="rounded bg-background/40 px-2 py-1 text-center">
+                      {d}
+                    </div>
+                  ))}
                 </div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+                <div className="mt-1 grid grid-cols-7 gap-1">
+                  {monthCells.map((d) => {
+                    const dayKey = toDayKey(d);
+                    const dayEvents = eventsByDay.get(dayKey) || [];
+                    const inCurrentMonth = d.getMonth() === anchorDate.getMonth();
+                    const isSelected = sameDay(d, selectedDate);
+                    const isToday = sameDay(d, new Date());
+                    return (
+                      <button
+                        key={dayKey}
+                        type="button"
+                        onClick={() => setSelectedDate(d)}
+                        className={`min-h-[108px] rounded border px-2 py-1 text-left transition ${
+                          isSelected
+                            ? "border-cyan-400/70 bg-cyan-500/15"
+                            : "border-border/60 bg-background/35 hover:border-cyan-400/40"
+                        }`}
+                      >
+                        <div className={`text-xs font-medium ${inCurrentMonth ? "text-foreground" : "text-muted-foreground/60"}`}>
+                          {isToday ? <span className="rounded bg-cyan-500/20 px-1.5 py-0.5">{d.getDate()}</span> : d.getDate()}
+                        </div>
+                        <div className="mt-1 space-y-1">
+                          {dayEvents.slice(0, 2).map((ev) => (
+                            <div key={ev.id} className="truncate rounded bg-slate-800/70 px-1.5 py-0.5 text-[11px] text-cyan-100">
+                              {formatEventTimeRange(ev)} {ev.title}
+                            </div>
+                          ))}
+                          {dayEvents.length > 2 ? (
+                            <div className="text-[11px] text-muted-foreground">+{dayEvents.length - 2} more</div>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+
+            {!loadingEvents && view === "week" ? (
+              <div className="grid gap-2 md:grid-cols-7">
+                {weekDays.map((d) => {
+                  const key = toDayKey(d);
+                  const dayEvents = eventsByDay.get(key) || [];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedDate(d)}
+                      className={`rounded border p-2 text-left ${
+                        sameDay(d, selectedDate)
+                          ? "border-cyan-400/70 bg-cyan-500/15"
+                          : "border-border/60 bg-background/35 hover:border-cyan-400/40"
+                      }`}
+                    >
+                      <div className="text-xs text-muted-foreground">{d.toLocaleDateString(undefined, { weekday: "short" })}</div>
+                      <div className="text-sm font-semibold text-foreground">{d.getDate()}</div>
+                      <div className="mt-2 space-y-1">
+                        {dayEvents.length === 0 ? (
+                          <div className="text-[11px] text-muted-foreground">No events</div>
+                        ) : (
+                          dayEvents.slice(0, 6).map((ev) => (
+                            <div key={ev.id} className="truncate rounded bg-slate-800/70 px-1.5 py-1 text-[11px] text-cyan-100">
+                              {formatEventTimeRange(ev)} {ev.title}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {!loadingEvents && view === "day" ? (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-cyan-200">{formatDateHeading(selectedDate)}</div>
+                {selectedDayEvents.length === 0 ? (
+                  <div className="rounded border border-border/60 bg-background/35 px-3 py-3 text-sm text-muted-foreground">
+                    No appointments on this day.
+                  </div>
+                ) : (
+                  selectedDayEvents.map((ev) => (
+                    <div key={ev.id} className="rounded border border-border/60 bg-background/35 px-3 py-2">
+                      <div className="text-sm font-medium text-foreground">{ev.title}</div>
+                      <div className="text-xs text-muted-foreground">{formatEventTimeRange(ev)}</div>
+                      {ev.link ? (
+                        <a
+                          className="mt-1 inline-block text-xs text-cyan-400 underline decoration-cyan-500/40"
+                          href={ev.link}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open event
+                        </a>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-4">
+            <section className="rounded border border-border/70 bg-background/30 p-3">
+              <h2 className="text-sm font-semibold text-foreground">Booking rules</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Control double/triple-booking behavior.</p>
+              <div className="mt-3 space-y-2">
+                <label className="block text-xs text-muted-foreground">Capacity</label>
+                <select
+                  value={maxConcurrent}
+                  onChange={(e) => setMaxConcurrent(e.target.value)}
+                  className="w-full rounded border border-border bg-background px-2 py-2 text-sm"
+                >
+                  <option value="1">Single booking</option>
+                  <option value="2">Double booking</option>
+                  <option value="3">Triple booking</option>
+                </select>
+              </div>
+              <div className="mt-3 space-y-2">
+                <label className="block text-xs text-muted-foreground">Overlap window</label>
+                <select
+                  value={overlapWindow}
+                  onChange={(e) => setOverlapWindow(e.target.value)}
+                  className="w-full rounded border border-border bg-background px-2 py-2 text-sm"
+                >
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">60 minutes</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={saveRules}
+                disabled={savingRules}
+                className="mt-3 w-full rounded border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
+              >
+                {savingRules ? "Saving..." : "Save rules"}
+              </button>
+            </section>
+
+            <section className="rounded border border-border/70 bg-background/30 p-3">
+              <h2 className="text-sm font-semibold text-foreground">Selected day</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{formatDateHeading(selectedDate)}</p>
+              <div className="mt-2 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                {selectedDayEvents.length === 0 ? (
+                  <div className="rounded border border-border/60 bg-background/35 px-2 py-2 text-xs text-muted-foreground">
+                    No appointments.
+                  </div>
+                ) : (
+                  selectedDayEvents.map((ev) => (
+                    <div key={`side-${ev.id}`} className="rounded border border-border/60 bg-background/35 px-2 py-2">
+                      <div className="text-xs font-semibold text-foreground">{ev.title}</div>
+                      <div className="text-[11px] text-muted-foreground">{formatEventTimeRange(ev)}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
       </section>
 
       {setupOpen ? (

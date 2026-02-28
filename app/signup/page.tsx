@@ -19,6 +19,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [website, setWebsite] = useState("");
   const [inviteToken, setInviteToken] = useState("");
+  const [agreementOpened, setAgreementOpened] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,6 +55,7 @@ export default function SignupPage() {
           inviteToken,
           website,
           agreementAccepted,
+          agreementViewed: agreementOpened,
         }),
       });
 
@@ -64,6 +66,7 @@ export default function SignupPage() {
         else if (code === "invite_required") setError("A valid invite is required to sign up.");
         else if (code === "invite_invalid") setError("This invite is invalid, revoked, or expired.");
         else if (code === "invite_email_mismatch") setError("This invite is for a different email address.");
+        else if (code === "agreement_view_required") setError("Please open and review the Beta Tester Agreement.");
         else if (code === "agreement_required") setError("You must accept the User Agreement.");
         else if (code === "weak_password") setError("Password must be at least 8 characters.");
         else setError("Signup failed. Please check your details.");
@@ -78,6 +81,7 @@ export default function SignupPage() {
       setPassword("");
       setConfirmPassword("");
       setWebsite("");
+      setAgreementOpened(false);
       setAgreementAccepted(false);
     } finally {
       setLoading(false);
@@ -116,17 +120,37 @@ export default function SignupPage() {
               aria-hidden="true"
             />
 
+            <div className="rounded border border-border/70 bg-background/40 p-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setAgreementOpened(true);
+                  window.open("/agreements/InfiniteDrip_Beta_Tester_Agreement.pdf", "_blank", "noopener,noreferrer");
+                }}
+                className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/25"
+              >
+                Open Beta Tester Agreement (PDF)
+              </button>
+              <p className="mt-2 text-xs text-gray-500">
+                You must open and review this agreement before signup is allowed.
+              </p>
+              {agreementOpened ? (
+                <p className="mt-1 text-xs text-emerald-600">Agreement opened.</p>
+              ) : null}
+            </div>
+
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
                 className="mt-1"
+                disabled={!agreementOpened}
               />
               <span>
                 I agree to the{" "}
-                <Link href="/user-agreement" className="text-blue-600 hover:underline" target="_blank">
-                  User Agreement
+                <Link href="/agreements/InfiniteDrip_Beta_Tester_Agreement.pdf" className="text-blue-600 hover:underline" target="_blank">
+                  InfiniteDrip Beta Tester Agreement
                 </Link>
                 .
               </span>
