@@ -31,10 +31,24 @@ type SettingsResponse = {
   settings?: {
     calendar_max_concurrent_bookings?: number;
     calendar_overlap_window_minutes?: number;
+    calendar_blockout_enabled?: boolean;
+    calendar_blockout_weekdays?: number[] | string;
+    calendar_blockout_all_day?: boolean;
+    calendar_blockout_start?: string;
+    calendar_blockout_end?: string;
   };
 };
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const BLOCKOUT_DAY_PILLS = [
+  { key: 1, label: "M" },
+  { key: 2, label: "T" },
+  { key: 3, label: "W" },
+  { key: 4, label: "TH" },
+  { key: 5, label: "F" },
+  { key: 6, label: "SA" },
+  { key: 0, label: "SU" },
+];
 
 function parseDateSafe(raw?: string | null): Date | null {
   if (!raw) return null;
@@ -170,6 +184,22 @@ function groupEventsByDay(items: Appointment[]): Map<string, Appointment[]> {
   return map;
 }
 
+function normalizeWeekdayList(raw: unknown): number[] {
+  const vals = Array.isArray(raw)
+    ? raw
+    : String(raw || "")
+        .split(/[,\s;]+/)
+        .filter(Boolean);
+  const out = new Set<number>();
+  for (const v of vals) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    const day = Math.floor(n);
+    if (day >= 0 && day <= 6) out.add(day);
+  }
+  return Array.from(out).sort((a, b) => a - b);
+}
+
 export default function CalendarPage() {
   const [loadingEvents, setLoadingEvents] = React.useState(true);
   const [savingRules, setSavingRules] = React.useState(false);
@@ -182,6 +212,11 @@ export default function CalendarPage() {
 
   const [maxConcurrent, setMaxConcurrent] = React.useState("1");
   const [overlapWindow, setOverlapWindow] = React.useState("30");
+  const [blockoutEnabled, setBlockoutEnabled] = React.useState(false);
+  const [blockoutWeekdays, setBlockoutWeekdays] = React.useState<number[]>([]);
+  const [blockoutAllDay, setBlockoutAllDay] = React.useState(false);
+  const [blockoutStart, setBlockoutStart] = React.useState("09:00");
+  const [blockoutEnd, setBlockoutEnd] = React.useState("17:00");
 
   const [status, setStatus] = React.useState<CalendarStatus | null>(null);
   const [statusLoading, setStatusLoading] = React.useState(false);
@@ -236,6 +271,11 @@ export default function CalendarPage() {
     const settings = settingsBody?.settings || {};
     setMaxConcurrent(String(settings.calendar_max_concurrent_bookings || 1));
     setOverlapWindow(String(settings.calendar_overlap_window_minutes || 30));
+    setBlockoutEnabled(!!settings.calendar_blockout_enabled);
+    setBlockoutWeekdays(normalizeWeekdayList(settings.calendar_blockout_weekdays));
+    setBlockoutAllDay(!!settings.calendar_blockout_all_day);
+    setBlockoutStart(String(settings.calendar_blockout_start || "09:00"));
+    setBlockoutEnd(String(settings.calendar_blockout_end || "17:00"));
   }, []);
 
   const loadEvents = React.useCallback(async () => {
@@ -282,6 +322,11 @@ export default function CalendarPage() {
       const body = {
         calendar_max_concurrent_bookings: Number(maxConcurrent || 1),
         calendar_overlap_window_minutes: Number(overlapWindow || 30),
+        calendar_blockout_enabled: blockoutEnabled,
+        calendar_blockout_weekdays: blockoutWeekdays,
+        calendar_blockout_all_day: blockoutAllDay,
+        calendar_blockout_start: blockoutStart,
+        calendar_blockout_end: blockoutEnd,
       };
       const res = await apiFetch("/api/settings", {
         method: "PUT",
@@ -336,6 +381,13 @@ export default function CalendarPage() {
     const now = new Date();
     setAnchorDate(now);
     setSelectedDate(now);
+  }
+
+  function toggleBlockoutWeekday(day: number) {
+    setBlockoutWeekdays((prev) => {
+      if (prev.includes(day)) return prev.filter((d) => d !== day).sort((a, b) => a - b);
+      return [...prev, day].sort((a, b) => a - b);
+    });
   }
 
   return (
@@ -569,6 +621,80 @@ export default function CalendarPage() {
               >
                 {savingRules ? "Saving..." : "Save rules"}
               </button>
+            </section>
+
+            <section className="rounded border border-border/70 bg-background/30 p-3">
+              <h2 className="text-sm font-semibold text-foreground">Blockout schedule</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                AI and manual booking will not set appointments during blocked days/times.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setBlockoutEnabled((v) => !v)}
+                className={`mt-3 w-full rounded border px-3 py-2 text-sm ${
+                  blockoutEnabled
+                    ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                    : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                }`}
+              >
+                {blockoutEnabled ? "Blockout enabled" : "Blockout disabled"}
+              </button>
+
+              <div className="mt-3">
+                <div className="mb-1 text-xs text-muted-foreground">Blocked weekdays</div>
+                <div className="flex flex-wrap gap-2">
+                  {BLOCKOUT_DAY_PILLS.map((day) => {
+                    const active = blockoutWeekdays.includes(day.key);
+                    return (
+                      <button
+                        key={day.key}
+                        type="button"
+                        onClick={() => toggleBlockoutWeekday(day.key)}
+                        className={`h-8 min-w-8 rounded-full border px-2 text-xs font-semibold ${
+                          active
+                            ? "border-cyan-400/50 bg-cyan-500/20 text-cyan-100"
+                            : "border-border/70 bg-background/40 text-muted-foreground"
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={blockoutAllDay}
+                  onChange={(e) => setBlockoutAllDay(e.target.checked)}
+                />
+                Block all day on selected weekdays
+              </label>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <label className="text-xs text-muted-foreground">
+                  Start
+                  <input
+                    type="time"
+                    value={blockoutStart}
+                    onChange={(e) => setBlockoutStart(e.target.value)}
+                    disabled={blockoutAllDay}
+                    className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
+                  />
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  End
+                  <input
+                    type="time"
+                    value={blockoutEnd}
+                    onChange={(e) => setBlockoutEnd(e.target.value)}
+                    disabled={blockoutAllDay}
+                    className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
+                  />
+                </label>
+              </div>
             </section>
 
             <section className="rounded border border-border/70 bg-background/30 p-3">
