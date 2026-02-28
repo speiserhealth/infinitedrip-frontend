@@ -66,6 +66,7 @@ export default function SignupPage() {
         else if (code === "invite_required") setError("A valid invite is required to sign up.");
         else if (code === "invite_invalid") setError("This invite is invalid, revoked, or expired.");
         else if (code === "invite_email_mismatch") setError("This invite is for a different email address.");
+        else if (code === "rate_limited") setError("Too many signup attempts from this network. Please wait a bit and try again.");
         else if (code === "agreement_view_required") setError("Please open and review the Beta Tester Agreement.");
         else if (code === "agreement_required") setError("You must accept the User Agreement.");
         else if (code === "weak_password") setError("Password must be at least 8 characters.");
