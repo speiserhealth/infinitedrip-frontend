@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 
-type LeadStatus = "engaged" | "booked" | "sold" | "cold" | "dead";
+type LeadStatus = "engaged" | "booked" | "missed_appointment" | "sold" | "cold" | "dead";
 
 type Lead = {
   id: number;
@@ -43,6 +43,7 @@ type LeadsResponse = {
 const STATUS_STYLE: Record<LeadStatus, string> = {
   engaged: "border-amber-400/40 bg-amber-500/15 text-amber-300",
   booked: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+  missed_appointment: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-300",
   sold: "border-indigo-400/40 bg-indigo-500/15 text-indigo-300",
   cold: "border-cyan-400/40 bg-cyan-500/15 text-cyan-300",
   dead: "border-rose-400/40 bg-rose-500/15 text-rose-300",
@@ -51,8 +52,15 @@ const STATUS_STYLE: Record<LeadStatus, string> = {
 function normalizeStatus(s: any): LeadStatus {
   const v = String(s || "engaged").toLowerCase();
   if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
-  if (v === "booked" || v === "sold" || v === "cold" || v === "dead") return v;
+  if (v === "booked" || v === "missed_appointment" || v === "sold" || v === "cold" || v === "dead") return v;
   return "engaged";
+}
+
+function formatMessagePreview(text?: string | null) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  if (s.length <= 64) return s;
+  return `${s.slice(0, 64)}...`;
 }
 
 function toDateSafe(v?: string | null): number {
@@ -692,6 +700,11 @@ export default function LeadsPage() {
                           {l.name || l.phone || `Lead #${l.id}`}
                         </Link>
                         <div className="text-[11px] text-muted-foreground">{l.phone}</div>
+                        {formatMessagePreview(l.last_message) ? (
+                          <div className="mt-0.5 max-w-[260px] truncate text-[11px] text-muted-foreground">
+                            {formatMessagePreview(l.last_message)}
+                          </div>
+                        ) : null}
                       </div>
                     </td>
 

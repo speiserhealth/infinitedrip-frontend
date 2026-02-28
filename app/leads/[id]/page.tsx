@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
-type LeadStatus = "engaged" | "cold" | "booked" | "sold" | "dead";
+type LeadStatus = "engaged" | "cold" | "booked" | "missed_appointment" | "sold" | "dead";
 
 type Lead = {
   id: number;
@@ -22,6 +22,8 @@ type Lead = {
   ai_allow_aca_override?: number | null;
   auto_followup_enabled?: number | null;
   auto_followup_config?: string | null;
+  appointment_reminders_enabled?: number | null;
+  appointment_reminder_offsets?: string | null;
   ai_paused?: number | null;
   ai_cooldown_until?: string | null;
   ai_pause_reason?: string | null;
@@ -37,6 +39,8 @@ type Msg = {
   direction: "in" | "out";
   text: string;
   created_at?: string | null;
+  ai_response_source?: string | null;
+  ai_faq_id?: number | null;
   delivery_status?: string | null;
   delivery_status_at?: string | null;
   ai_feedback_positive?: number | null;
@@ -131,6 +135,37 @@ const AUTO_FOLLOWUP_DELAY_OPTIONS = [
   { value: 10080, label: "7 days" },
 ];
 
+const APPOINTMENT_REMINDER_MAX_MINUTES = 7 * 24 * 60;
+
+function parseAppointmentReminderOffsets(raw: unknown): number[] {
+  const values = Array.isArray(raw)
+    ? raw
+    : String(raw || "")
+        .split(/[,\s;]+/)
+        .filter(Boolean);
+  const out: number[] = [];
+  for (const v of values) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    const m = Math.floor(n);
+    if (m >= 1 && m <= APPOINTMENT_REMINDER_MAX_MINUTES) out.push(m);
+  }
+  return Array.from(new Set(out)).sort((a, b) => a - b);
+}
+
+function formatAppointmentReminderOffsetLabel(minutes: number) {
+  const m = Math.max(1, Math.floor(Number(minutes || 0)));
+  if (m % (24 * 60) === 0) {
+    const days = Math.floor(m / (24 * 60));
+    return `${days} day${days === 1 ? "" : "s"} before`;
+  }
+  if (m % 60 === 0) {
+    const hours = Math.floor(m / 60);
+    return `${hours} hour${hours === 1 ? "" : "s"} before`;
+  }
+  return `${m} min before`;
+}
+
 function formatTime(raw?: string | null) {
   if (!raw) return "";
   const iso = raw.includes("T") ? raw : raw.replace(" ", "T") + "Z";
@@ -151,12 +186,13 @@ function addMinutesToLocalInput(localValue: string, minutes: number) {
   return `${y}-${m}-${day}T${hh}:${mm}`;
 }
 
-const STATUSES: LeadStatus[] = ["engaged", "cold", "booked", "sold", "dead"];
+const STATUSES: LeadStatus[] = ["engaged", "cold", "booked", "missed_appointment", "sold", "dead"];
 
 const STATUS_STYLE: Record<LeadStatus, string> = {
   engaged: "border-amber-400/40 bg-amber-500/15 text-amber-300",
   cold: "border-cyan-400/40 bg-cyan-500/15 text-cyan-300",
   booked: "bg-emerald-500/15 text-emerald-200 border-emerald-400/40",
+  missed_appointment: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-300",
   sold: "border-indigo-400/40 bg-indigo-500/15 text-indigo-300",
   dead: "bg-rose-500/15 text-rose-300 border-rose-400/40",
 };
@@ -167,7 +203,7 @@ const HISTORY_SYNC_INTERVAL_MS = 60 * 1000;
 function normalizeStatus(s: any): LeadStatus {
   const v = String(s || "engaged").toLowerCase();
   if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
-  if (v === "cold" || v === "booked" || v === "sold" || v === "dead") return v;
+  if (v === "cold" || v === "booked" || v === "missed_appointment" || v === "sold" || v === "dead") return v;
   return "engaged";
 }
 
@@ -294,9 +330,14 @@ export default function LeadThreadPage() {
   const [updatingLeadQuote, setUpdatingLeadQuote] = React.useState(false);
   const [updatingLeadAca, setUpdatingLeadAca] = React.useState(false);
   const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
+  const [updatingAppointmentReminders, setUpdatingAppointmentReminders] = React.useState(false);
   const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
   const [autoFollowupDraftDirty, setAutoFollowupDraftDirty] = React.useState(false);
   const [autoFollowupDraft, setAutoFollowupDraft] = React.useState<AutoFollowupConfig | null>(null);
+  const [appointmentRemindersEnabled, setAppointmentRemindersEnabled] = React.useState(false);
+  const [appointmentReminderOffsets, setAppointmentReminderOffsets] = React.useState<number[]>([]);
+  const [appointmentReminderValue, setAppointmentReminderValue] = React.useState("15");
+  const [appointmentReminderUnit, setAppointmentReminderUnit] = React.useState<"minutes" | "hours" | "days">("minutes");
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [updatingDnc, setUpdatingDnc] = React.useState(false);
@@ -348,6 +389,10 @@ export default function LeadThreadPage() {
         } catch {
           setAutoFollowupConfig(normalizeAutoFollowupConfig({}));
         }
+      }
+      if (!autoFollowupModalOpenRef.current) {
+        setAppointmentRemindersEnabled(Number(found.appointment_reminders_enabled || 0) === 1);
+        setAppointmentReminderOffsets(parseAppointmentReminderOffsets(found.appointment_reminder_offsets));
       }
     }
 
@@ -819,6 +864,57 @@ export default function LeadThreadPage() {
     }
   }
 
+  function addAppointmentReminderOffset() {
+    const raw = Number(appointmentReminderValue || "0");
+    if (!Number.isFinite(raw) || raw <= 0) return;
+    const minutes = appointmentReminderUnit === "days"
+      ? Math.floor(raw * 24 * 60)
+      : appointmentReminderUnit === "hours"
+        ? Math.floor(raw * 60)
+        : Math.floor(raw);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > APPOINTMENT_REMINDER_MAX_MINUTES) return;
+    setAppointmentReminderOffsets((prev) => Array.from(new Set([...prev, minutes])).sort((a, b) => a - b));
+  }
+
+  function removeAppointmentReminderOffset(minutes: number) {
+    const m = Math.max(1, Math.floor(Number(minutes || 0)));
+    setAppointmentReminderOffsets((prev) => prev.filter((x) => Number(x) !== m));
+  }
+
+  async function saveAppointmentReminders() {
+    if (!leadId) return;
+    try {
+      setUpdatingAppointmentReminders(true);
+      const r = await apiFetch(`${API_BASE}/api/leads/${leadId}/appointment-reminders`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: appointmentRemindersEnabled,
+          offsets: appointmentReminderOffsets,
+        }),
+      });
+      if (!r.ok) throw new Error("Appointment reminders save failed");
+      const body = await r.json().catch(() => ({}));
+      const enabled = !!body?.enabled;
+      const offsets = parseAppointmentReminderOffsets(body?.offsets);
+      setAppointmentRemindersEnabled(enabled);
+      setAppointmentReminderOffsets(offsets);
+      setLead((prev) =>
+        prev
+          ? {
+              ...prev,
+              appointment_reminders_enabled: enabled ? 1 : 0,
+              appointment_reminder_offsets: offsets.join(","),
+            }
+          : prev
+      );
+    } catch {
+      alert("Appointment reminders save failed");
+    } finally {
+      setUpdatingAppointmentReminders(false);
+    }
+  }
+
   async function handleHotToggle(nextHot: boolean) {
     if (!leadId) return;
     try {
@@ -1203,7 +1299,7 @@ export default function LeadThreadPage() {
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {s.replace(/_/g, " ")}
                 </option>
               ))}
             </select>
@@ -1284,13 +1380,22 @@ export default function LeadThreadPage() {
             {filtered.length === 0 ? (
               <div className="text-muted-foreground">{q.trim() ? "No matches." : "No messages yet."}</div>
             ) : (
-              filtered.map((m) => (
-                <div
-                  key={m.id}
-                  className={`border rounded-lg p-3 shadow-sm ${m.direction === "out" ? "bg-cyan-500/10 ml-8" : "bg-card/70 mr-8"}`}
-                >
+              filtered.map((m) => {
+                const isFaqGuardrail = String(m.ai_response_source || "").toLowerCase() === "faq_guardrail";
+                return (
+                  <div
+                    key={m.id}
+                    className={`border rounded-lg p-3 shadow-sm ${m.direction === "out" ? "bg-cyan-500/10 ml-8" : "bg-card/70 mr-8"}`}
+                  >
                   <div className="flex justify-between mb-1 text-xs">
-                    <div className="font-medium">{m.direction === "in" ? "Inbound" : "Outbound"}</div>
+                    <div className="font-medium flex items-center gap-2">
+                      <span>{m.direction === "in" ? "Inbound" : "Outbound"}</span>
+                      {m.direction === "out" && isFaqGuardrail ? (
+                        <span className="rounded border border-violet-400/40 bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-200">
+                          FAQ Guardrail
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="text-muted-foreground">{formatTime(m.created_at)}</div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -1314,13 +1419,13 @@ export default function LeadThreadPage() {
                               ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
                               : "border-border bg-card/70 text-muted-foreground hover:bg-muted/40"
                           } disabled:opacity-60`}
-                          title="Mark this AI reply as great"
+                          title={isFaqGuardrail ? "Mark this FAQ guardrail reply as great" : "Mark this AI reply as great"}
                         >
                           {feedbackBusyKey === `${Number(m.id)}:positive`
                             ? "Saving..."
                             : Number(m.ai_feedback_positive || 0) === 1
-                              ? "👍 Great Saved"
-                              : "👍 Great Reply"}
+                              ? (isFaqGuardrail ? "👍 FAQ Great Saved" : "👍 Great Saved")
+                              : (isFaqGuardrail ? "👍 FAQ Great" : "👍 Great Reply")}
                         </button>
                         <button
                           type="button"
@@ -1331,19 +1436,20 @@ export default function LeadThreadPage() {
                               ? "border-rose-400/40 bg-rose-500/15 text-rose-200"
                               : "border-border bg-card/70 text-muted-foreground hover:bg-muted/40"
                           } disabled:opacity-60`}
-                          title="Mark this AI reply as poor for review"
+                          title={isFaqGuardrail ? "Mark this FAQ guardrail reply as poor for review" : "Mark this AI reply as poor for review"}
                         >
                           {feedbackBusyKey === `${Number(m.id)}:negative`
                             ? "Saving..."
                             : Number(m.ai_feedback_negative || 0) === 1
-                              ? "💩 Shit Saved"
-                              : "💩 Shit Reply"}
+                              ? (isFaqGuardrail ? "💩 FAQ Shit Saved" : "💩 Shit Saved")
+                              : (isFaqGuardrail ? "💩 FAQ Shit" : "💩 Shit Reply")}
                         </button>
                       </div>
                     ) : null}
                   </div>
-                </div>
-              ))
+                  </div>
+                );
+              })
             )}
           </div>
 
@@ -1462,6 +1568,81 @@ export default function LeadThreadPage() {
             <div className="mb-3 text-xs text-muted-foreground">
               Set follow-up message type and delay for each scenario. Messages send exactly as written.
               Countdown tracking is internal and resets when the lead replies.
+            </div>
+
+            <div className="mb-3 rounded border border-border/70 bg-card/60 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium">Auto-text Appointment Reminders</div>
+                  <div className="text-xs text-muted-foreground">
+                    Independent from Automatic Followup. Uses customer timezone when available.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAppointmentRemindersEnabled((v) => !v)}
+                  className={`rounded border px-3 py-1 text-xs ${
+                    appointmentRemindersEnabled
+                      ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                      : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                  }`}
+                >
+                  {appointmentRemindersEnabled ? "Enabled" : "Disabled"}
+                </button>
+              </div>
+
+              <div className="mb-2 flex flex-wrap gap-2">
+                {appointmentReminderOffsets.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">No active reminder times.</span>
+                ) : (
+                  appointmentReminderOffsets.map((offset) => (
+                    <button
+                      key={offset}
+                      type="button"
+                      onClick={() => removeAppointmentReminderOffset(offset)}
+                      className="rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-1 text-xs text-emerald-200"
+                      title="Remove time"
+                    >
+                      {formatAppointmentReminderOffsetLabel(offset)} ×
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={10080}
+                  value={appointmentReminderValue}
+                  onChange={(e) => setAppointmentReminderValue(e.target.value)}
+                  className="w-24 rounded border px-2 py-1.5 text-sm"
+                />
+                <select
+                  value={appointmentReminderUnit}
+                  onChange={(e) => setAppointmentReminderUnit(e.target.value as "minutes" | "hours" | "days")}
+                  className="rounded border px-2 py-1.5 text-sm"
+                >
+                  <option value="minutes">minutes</option>
+                  <option value="hours">hours</option>
+                  <option value="days">days</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={addAppointmentReminderOffset}
+                  className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-200"
+                >
+                  Add Time
+                </button>
+                <button
+                  type="button"
+                  onClick={saveAppointmentReminders}
+                  disabled={updatingAppointmentReminders}
+                  className="rounded border border-emerald-400/40 bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-500 disabled:opacity-70"
+                >
+                  {updatingAppointmentReminders ? "Saving..." : "Save Reminder Settings"}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">

@@ -16,14 +16,17 @@ type SettingsResponse = {
     ai_first_reply_mode?: string;
     ai_name?: string;
     ai_allow_quote?: boolean;
+    ai_quote_deviation_single?: number;
+    ai_quote_deviation_couple?: number;
+    ai_quote_deviation_per_dependent?: number;
+    ai_schedule_time_mode?: "offer_two_times" | "accept_client_time" | string;
+    ai_appointment_confirmation_text?: string;
     ai_quiet_hours_enabled?: boolean;
     ai_quiet_hours_start?: string;
     ai_quiet_hours_end?: string;
     ai_max_replies_per_5m?: number;
     ai_reply_cooldown_minutes?: number;
     ai_reply_cooldown_seconds?: number;
-    appointment_reminders_enabled?: boolean;
-    appointment_reminder_offsets?: number[] | string;
     google_calendar_id?: string;
     google_client_id?: string;
     google_client_secret_set?: boolean;
@@ -41,13 +44,16 @@ type FormState = {
   ai_first_reply_mode: "require_prior_outbound" | "allow_first_reply";
   ai_name: string;
   ai_allow_quote: boolean;
+  ai_quote_deviation_single: string;
+  ai_quote_deviation_couple: string;
+  ai_quote_deviation_per_dependent: string;
+  ai_schedule_time_mode: "offer_two_times" | "accept_client_time";
+  ai_appointment_confirmation_text: string;
   ai_quiet_hours_enabled: boolean;
   ai_quiet_hours_start: string;
   ai_quiet_hours_end: string;
   ai_max_replies_per_5m: string;
   ai_reply_cooldown_seconds: string;
-  appointment_reminders_enabled: boolean;
-  appointment_reminder_offsets: string[];
   google_calendar_id: string;
   google_client_id: string;
   google_client_secret: string;
@@ -117,13 +123,16 @@ const INITIAL_FORM: FormState = {
   ai_first_reply_mode: "require_prior_outbound",
   ai_name: "",
   ai_allow_quote: false,
+  ai_quote_deviation_single: "100",
+  ai_quote_deviation_couple: "150",
+  ai_quote_deviation_per_dependent: "25",
+  ai_schedule_time_mode: "offer_two_times",
+  ai_appointment_confirmation_text: "",
   ai_quiet_hours_enabled: false,
   ai_quiet_hours_start: "22:00",
   ai_quiet_hours_end: "08:00",
   ai_max_replies_per_5m: "20",
   ai_reply_cooldown_seconds: "60",
-  appointment_reminders_enabled: false,
-  appointment_reminder_offsets: [],
   google_calendar_id: "",
   google_client_id: "",
   google_client_secret: "",
@@ -157,28 +166,36 @@ function clampMaxReplies(value: string) {
   return Math.max(1, Math.min(100, Math.floor(n)));
 }
 
-function normalizeReminderOffsets(raw: unknown): string[] {
-  const vals = Array.isArray(raw)
-    ? raw
-    : String(raw || "")
-        .split(/[,\s;]+/)
-        .filter(Boolean);
-  const set = new Set<string>();
-  for (const v of vals) {
-    const n = Number(v);
-    if (!Number.isFinite(n)) continue;
-    const m = Math.floor(n);
-    if (m === 15 || m === 30 || m === 60) set.add(String(m));
-  }
-  return Array.from(set).sort((a, b) => Number(a) - Number(b));
-}
-
 function normalizeCooldownSeconds(raw: unknown): string {
   const n = Number(raw);
   if (!Number.isFinite(n)) return "60";
-  if (n <= 30) return "15";
-  if (n >= 300) return "300";
-  return "60";
+  return String(Math.max(0, Math.min(7200, Math.floor(n))));
+}
+
+function deriveCooldownUnit(secondsRaw: unknown): "seconds" | "minutes" {
+  const n = Number(secondsRaw);
+  if (!Number.isFinite(n)) return "seconds";
+  if (n >= 60 && n % 60 === 0) return "minutes";
+  return "seconds";
+}
+
+function cooldownDisplayValueFromSeconds(secondsRaw: unknown, unit: "seconds" | "minutes"): string {
+  const n = Number(normalizeCooldownSeconds(secondsRaw));
+  if (unit === "minutes") return String(Math.max(0, Math.floor(n / 60)));
+  return String(Math.max(0, Math.floor(n)));
+}
+
+function clampCooldownDisplayValue(raw: string, unit: "seconds" | "minutes"): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return "0";
+  if (unit === "minutes") return String(Math.max(0, Math.min(120, Math.floor(n))));
+  return String(Math.max(0, Math.min(7200, Math.floor(n))));
+}
+
+function normalizeQuoteDeviation(raw: unknown, fallback: number, max: number): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return String(fallback);
+  return String(Math.max(0, Math.min(max, Math.floor(n))));
 }
 
 export default function SettingsPage() {
@@ -216,18 +233,21 @@ export default function SettingsPage() {
   const [adminFaqBusyId, setAdminFaqBusyId] = React.useState<number | null>(null);
   const [newFaqQuestion, setNewFaqQuestion] = React.useState("");
   const [newFaqAnswer, setNewFaqAnswer] = React.useState("");
-  const [newFaqPriority, setNewFaqPriority] = React.useState("100");
+  const [newFaqPriority, setNewFaqPriority] = React.useState("50");
   const [newAdminFaqQuestion, setNewAdminFaqQuestion] = React.useState("");
   const [newAdminFaqAnswer, setNewAdminFaqAnswer] = React.useState("");
-  const [newAdminFaqPriority, setNewAdminFaqPriority] = React.useState("100");
+  const [newAdminFaqPriority, setNewAdminFaqPriority] = React.useState("50");
 
   const [aiTestOpen, setAiTestOpen] = React.useState(false);
   const [aiTestInput, setAiTestInput] = React.useState("");
   const [aiTestBusy, setAiTestBusy] = React.useState(false);
   const [aiTestThread, setAiTestThread] = React.useState<AiTestMsg[]>([]);
   const aiTestScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const [quoteModalOpen, setQuoteModalOpen] = React.useState(false);
 
   const [form, setForm] = React.useState<FormState>(INITIAL_FORM);
+  const [aiCooldownUnit, setAiCooldownUnit] = React.useState<"seconds" | "minutes">("seconds");
+  const [aiCooldownValue, setAiCooldownValue] = React.useState("60");
   const [googleStatus, setGoogleStatus] = React.useState("");
 
   async function loadSettings() {
@@ -244,6 +264,12 @@ export default function SettingsPage() {
       const s = data?.settings || {};
       setWebhookUrl(String(data?.webhook_url || ""));
       setTextdripBaseUrlEffective(String(s.textdrip_base_url_effective || s.textdrip_base_url || ""));
+      const cooldownSeconds = normalizeCooldownSeconds(
+        s.ai_reply_cooldown_seconds ?? (Number(s.ai_reply_cooldown_minutes || 2) * 60)
+      );
+      const cooldownUnit = deriveCooldownUnit(cooldownSeconds);
+      setAiCooldownUnit(cooldownUnit);
+      setAiCooldownValue(cooldownDisplayValueFromSeconds(cooldownSeconds, cooldownUnit));
 
       setForm({
         textdrip_api_token: "",
@@ -255,15 +281,19 @@ export default function SettingsPage() {
             : "require_prior_outbound",
         ai_name: String(s.ai_name || ""),
         ai_allow_quote: !!s.ai_allow_quote,
+        ai_quote_deviation_single: normalizeQuoteDeviation(s.ai_quote_deviation_single, 100, 5000),
+        ai_quote_deviation_couple: normalizeQuoteDeviation(s.ai_quote_deviation_couple, 150, 5000),
+        ai_quote_deviation_per_dependent: normalizeQuoteDeviation(s.ai_quote_deviation_per_dependent, 25, 1000),
+        ai_schedule_time_mode:
+          String(s.ai_schedule_time_mode || "").trim().toLowerCase() === "accept_client_time"
+            ? "accept_client_time"
+            : "offer_two_times",
+        ai_appointment_confirmation_text: String(s.ai_appointment_confirmation_text || ""),
         ai_quiet_hours_enabled: !!s.ai_quiet_hours_enabled,
         ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
         ai_quiet_hours_end: String(s.ai_quiet_hours_end || "08:00"),
         ai_max_replies_per_5m: String(clampMaxReplies(String(s.ai_max_replies_per_5m ?? "20"))),
-        ai_reply_cooldown_seconds: normalizeCooldownSeconds(
-          s.ai_reply_cooldown_seconds ?? (Number(s.ai_reply_cooldown_minutes || 2) * 60)
-        ),
-        appointment_reminders_enabled: !!s.appointment_reminders_enabled,
-        appointment_reminder_offsets: normalizeReminderOffsets(s.appointment_reminder_offsets),
+        ai_reply_cooldown_seconds: cooldownSeconds,
         google_calendar_id: String(s.google_calendar_id || ""),
         google_client_id: String(s.google_client_id || ""),
         google_client_secret: "",
@@ -321,11 +351,11 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!textdripModalOpen && !aiTestOpen) return;
+    if (!textdripModalOpen && !aiTestOpen && !quoteModalOpen) return;
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "auto" });
     });
-  }, [textdripModalOpen, aiTestOpen]);
+  }, [textdripModalOpen, aiTestOpen, quoteModalOpen]);
 
   React.useEffect(() => {
     if (!aiTestOpen) return;
@@ -336,6 +366,28 @@ export default function SettingsPage() {
 
   function onField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setAiCooldownFromValue(rawValue: string, unit: "seconds" | "minutes") {
+    const cleaned = rawValue.replace(/[^\d]/g, "");
+    setAiCooldownValue(cleaned);
+    const parsed = Number(cleaned || "0");
+    const seconds = unit === "minutes" ? parsed * 60 : parsed;
+    onField("ai_reply_cooldown_seconds", normalizeCooldownSeconds(seconds));
+  }
+
+  function onAiCooldownUnitChange(nextUnit: "seconds" | "minutes") {
+    const seconds = Number(normalizeCooldownSeconds(form.ai_reply_cooldown_seconds));
+    setAiCooldownUnit(nextUnit);
+    setAiCooldownValue(cooldownDisplayValueFromSeconds(seconds, nextUnit));
+  }
+
+  function normalizeAiCooldownInputOnBlur() {
+    const normalized = clampCooldownDisplayValue(aiCooldownValue, aiCooldownUnit);
+    setAiCooldownValue(normalized);
+    const parsed = Number(normalized || "0");
+    const seconds = aiCooldownUnit === "minutes" ? parsed * 60 : parsed;
+    onField("ai_reply_cooldown_seconds", normalizeCooldownSeconds(seconds));
   }
 
   function openTextdripModal() {
@@ -364,7 +416,7 @@ export default function SettingsPage() {
         question: String(x?.question || ""),
         answer: String(x?.answer || ""),
         active: Number(x?.active || 0) ? 1 : 0,
-        priority: Number(x?.priority || 100),
+        priority: Number(x?.priority || 50),
         updated_at: x?.updated_at || null,
         created_at: x?.created_at || null,
       }))
@@ -389,7 +441,7 @@ export default function SettingsPage() {
         question: String(x?.question || ""),
         answer: String(x?.answer || ""),
         active: Number(x?.active || 0) ? 1 : 0,
-        priority: Number(x?.priority || 100),
+        priority: Number(x?.priority || 50),
         source: "admin_default",
         updated_at: x?.updated_at || null,
         created_at: x?.created_at || null,
@@ -437,7 +489,7 @@ export default function SettingsPage() {
   async function createFaq() {
     const question = String(newFaqQuestion || "").trim();
     const answer = String(newFaqAnswer || "").trim();
-    const priority = Math.max(1, Math.min(999, Math.floor(Number(newFaqPriority || "100") || 100)));
+    const priority = Math.max(1, Math.min(99, Math.floor(Number(newFaqPriority || "50") || 50)));
     if (!question || !answer) {
       throw new Error("Question and answer are required.");
     }
@@ -454,7 +506,7 @@ export default function SettingsPage() {
       }
       setNewFaqQuestion("");
       setNewFaqAnswer("");
-      setNewFaqPriority("100");
+      setNewFaqPriority("50");
       await loadFaqs();
       setSuccess("AI FAQ added.");
     } finally {
@@ -485,9 +537,9 @@ export default function SettingsPage() {
     if (nextQuestion === null) return;
     const nextAnswer = window.prompt("Answer", row.answer);
     if (nextAnswer === null) return;
-    const nextPriority = window.prompt("Priority (1-999, lower is stronger)", String(row.priority || 100));
+    const nextPriority = window.prompt("Priority (1-99, lower is stronger)", String(row.priority || 50));
     if (nextPriority === null) return;
-    const priority = Math.max(1, Math.min(999, Math.floor(Number(nextPriority || "100") || 100)));
+    const priority = Math.max(1, Math.min(99, Math.floor(Number(nextPriority || "50") || 50)));
 
     setFaqBusyId(row.id);
     try {
@@ -528,7 +580,7 @@ export default function SettingsPage() {
   async function createAdminFaq() {
     const question = String(newAdminFaqQuestion || "").trim();
     const answer = String(newAdminFaqAnswer || "").trim();
-    const priority = Math.max(1, Math.min(999, Math.floor(Number(newAdminFaqPriority || "100") || 100)));
+    const priority = Math.max(1, Math.min(99, Math.floor(Number(newAdminFaqPriority || "50") || 50)));
     if (!question || !answer) {
       throw new Error("Question and answer are required.");
     }
@@ -545,7 +597,7 @@ export default function SettingsPage() {
       }
       setNewAdminFaqQuestion("");
       setNewAdminFaqAnswer("");
-      setNewAdminFaqPriority("100");
+      setNewAdminFaqPriority("50");
       await loadAdminFaqs();
       setSuccess("Administrative default guardrail added.");
     } finally {
@@ -576,9 +628,9 @@ export default function SettingsPage() {
     if (nextQuestion === null) return;
     const nextAnswer = window.prompt("Answer", row.answer);
     if (nextAnswer === null) return;
-    const nextPriority = window.prompt("Priority (1-999, lower is stronger)", String(row.priority || 100));
+    const nextPriority = window.prompt("Priority (1-99, lower is stronger)", String(row.priority || 50));
     if (nextPriority === null) return;
-    const priority = Math.max(1, Math.min(999, Math.floor(Number(nextPriority || "100") || 100)));
+    const priority = Math.max(1, Math.min(99, Math.floor(Number(nextPriority || "50") || 50)));
 
     setAdminFaqBusyId(row.id);
     try {
@@ -636,6 +688,10 @@ export default function SettingsPage() {
           message: text,
           thread: payloadThread,
           allow_quote: !!form.ai_allow_quote,
+          quote_deviation_single: Number(form.ai_quote_deviation_single || "100"),
+          quote_deviation_couple: Number(form.ai_quote_deviation_couple || "150"),
+          quote_deviation_per_dependent: Number(form.ai_quote_deviation_per_dependent || "25"),
+          schedule_time_mode: form.ai_schedule_time_mode,
         }),
       });
       if (!res.ok) {
@@ -656,17 +712,6 @@ export default function SettingsPage() {
     onField("ai_max_replies_per_5m", String(clampMaxReplies(String(nextValue))));
   }
 
-  function toggleReminderOffset(offset: "15" | "30" | "60") {
-    const current = Array.isArray(form.appointment_reminder_offsets)
-      ? form.appointment_reminder_offsets
-      : [];
-    const has = current.includes(offset);
-    const next = has
-      ? current.filter((x) => x !== offset)
-      : [...current, offset].sort((a, b) => Number(a) - Number(b));
-    onField("appointment_reminder_offsets", next);
-  }
-
   function buildSettingsPayload() {
     const cooldownSeconds = Number(form.ai_reply_cooldown_seconds || "60");
     const payload: Record<string, unknown> = {
@@ -674,14 +719,17 @@ export default function SettingsPage() {
       ai_first_reply_mode: form.ai_first_reply_mode,
       ai_name: String(form.ai_name || "").trim(),
       ai_allow_quote: !!form.ai_allow_quote,
+      ai_quote_deviation_single: Number(normalizeQuoteDeviation(form.ai_quote_deviation_single, 100, 5000)),
+      ai_quote_deviation_couple: Number(normalizeQuoteDeviation(form.ai_quote_deviation_couple, 150, 5000)),
+      ai_quote_deviation_per_dependent: Number(normalizeQuoteDeviation(form.ai_quote_deviation_per_dependent, 25, 1000)),
+      ai_schedule_time_mode: form.ai_schedule_time_mode === "accept_client_time" ? "accept_client_time" : "offer_two_times",
+      ai_appointment_confirmation_text: String(form.ai_appointment_confirmation_text || "").trim(),
       ai_quiet_hours_enabled: form.ai_quiet_hours_enabled,
       ai_quiet_hours_start: form.ai_quiet_hours_start,
       ai_quiet_hours_end: form.ai_quiet_hours_end,
       ai_max_replies_per_5m: clampMaxReplies(form.ai_max_replies_per_5m),
       ai_reply_cooldown_seconds: Math.max(0, Math.min(7200, Math.floor(cooldownSeconds || 60))),
       ai_reply_cooldown_minutes: Math.max(0, Math.min(120, Math.floor((cooldownSeconds || 60) / 60))),
-      appointment_reminders_enabled: !!form.appointment_reminders_enabled,
-      appointment_reminder_offsets: normalizeReminderOffsets(form.appointment_reminder_offsets).map((x) => Number(x)),
       google_calendar_id: form.google_calendar_id,
       google_client_id: form.google_client_id,
     };
@@ -716,6 +764,21 @@ export default function SettingsPage() {
     try {
       await saveSettingsPayload();
       setSuccess("Settings saved.");
+    } catch (e: any) {
+      setError(String(e?.message || "Save failed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onSaveQuoteOptions() {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      await saveSettingsPayload();
+      setSuccess("Quote settings saved.");
+      setQuoteModalOpen(false);
     } catch (e: any) {
       setError(String(e?.message || "Save failed"));
     } finally {
@@ -975,63 +1038,29 @@ export default function SettingsPage() {
 
               <label className="block text-sm">
                 <span className="mb-1 block text-muted-foreground">AI Reply Cooldown</span>
-                <select
-                  value={form.ai_reply_cooldown_seconds}
-                  onChange={(e) => onField("ai_reply_cooldown_seconds", e.target.value)}
-                  className="w-full rounded border border-border px-3 py-2 text-sm"
-                >
-                  <option value="15">Seconds</option>
-                  <option value="60">1 minute</option>
-                  <option value="300">5 minutes</option>
-                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={aiCooldownUnit === "minutes" ? 120 : 7200}
+                    value={aiCooldownValue}
+                    onChange={(e) => setAiCooldownFromValue(e.target.value, aiCooldownUnit)}
+                    onBlur={normalizeAiCooldownInputOnBlur}
+                    className="w-full rounded border border-border px-3 py-2 text-sm"
+                  />
+                  <select
+                    value={aiCooldownUnit}
+                    onChange={(e) => onAiCooldownUnitChange(e.target.value === "minutes" ? "minutes" : "seconds")}
+                    className="w-36 rounded border border-border px-3 py-2 text-sm"
+                  >
+                    <option value="seconds">Seconds</option>
+                    <option value="minutes">Minutes</option>
+                  </select>
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Prevents immediate back-to-back AI auto replies for the same lead.
                 </p>
               </label>
-
-              <div className="block text-sm md:col-span-2 rounded border border-border/70 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <span className="mb-1 block text-foreground font-medium">Auto-text Appointment Reminders</span>
-                    <p className="text-xs text-muted-foreground">
-                      Send reminder SMS before booked appointments. Choose one, all, or none.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onField("appointment_reminders_enabled", !form.appointment_reminders_enabled)}
-                    className={`rounded px-3 py-2 text-sm ${
-                      form.appointment_reminders_enabled
-                        ? "bg-slate-900 text-white hover:bg-slate-800"
-                        : "border border-border text-muted-foreground hover:bg-muted/40"
-                    }`}
-                  >
-                    {form.appointment_reminders_enabled ? "Enabled" : "Disabled"}
-                  </button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {(["15", "30", "60"] as const).map((offset) => {
-                    const active = form.appointment_reminder_offsets.includes(offset);
-                    return (
-                      <button
-                        key={offset}
-                        type="button"
-                        onClick={() => toggleReminderOffset(offset)}
-                        className={`rounded border px-3 py-1.5 text-xs ${
-                          active
-                            ? "bg-cyan-500/15 border-cyan-400/40 text-cyan-200"
-                            : "bg-card/70 border-border text-muted-foreground hover:bg-muted/40"
-                        }`}
-                      >
-                        {offset === "60" ? "1 hour before" : `${offset} min before`}
-                      </button>
-                    );
-                  })}
-                </div>
-                {form.appointment_reminders_enabled && form.appointment_reminder_offsets.length === 0 ? (
-                  <p className="mt-2 text-xs text-amber-300">Select at least one reminder time.</p>
-                ) : null}
-              </div>
 
               <div className="block text-sm md:col-span-2 rounded border border-border/70 p-3">
                 <div className="mb-3">
@@ -1122,6 +1151,31 @@ export default function SettingsPage() {
                   Paste this URL into Textdrip inbound callback settings for this account.
                 </p>
               </div>
+            </div>
+          </section>
+
+          <section className="rounded border border-border/70 bg-card/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-medium text-foreground">Quote Settings</h2>
+              <button
+                type="button"
+                onClick={() => setQuoteModalOpen(true)}
+                className="rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
+              >
+                Open Quote Options
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Keep the age chart fixed and control quote range deviations + scheduling behavior from one popup.
+            </p>
+            <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+              <div>Quote mode: {form.ai_allow_quote ? "Enabled" : "Disabled"}</div>
+              <div>
+                Appointment time mode: {form.ai_schedule_time_mode === "accept_client_time" ? "Accept client time" : "Offer two alternatives"}
+              </div>
+              <div>Individual spread: +/-{normalizeQuoteDeviation(form.ai_quote_deviation_single, 100, 5000)}</div>
+              <div>Couple spread: +/-{normalizeQuoteDeviation(form.ai_quote_deviation_couple, 150, 5000)}</div>
+              <div>Each dependent after 2: +/-{normalizeQuoteDeviation(form.ai_quote_deviation_per_dependent, 25, 1000)}</div>
             </div>
           </section>
 
@@ -1260,25 +1314,20 @@ export default function SettingsPage() {
               </span>
             </label>
 
-            <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border/70 bg-muted/30 p-3">
-              <div>
-                <span className="mb-1 block text-foreground font-medium">Allow AI to Quote</span>
-                <p className="text-xs text-muted-foreground">
-                  When enabled, AI can give age-chart based quote ranges from your configured quote rules.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onField("ai_allow_quote", !form.ai_allow_quote)}
-                className={`rounded px-3 py-2 text-sm ${
-                  form.ai_allow_quote
-                    ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
-                    : "border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
-                }`}
-              >
-                {form.ai_allow_quote ? "Enabled" : "Disabled"}
-              </button>
-            </div>
+            <label className="mt-3 block text-sm">
+              <span className="mb-1 block text-muted-foreground">Appointment Confirmation Add-On</span>
+              <input
+                type="text"
+                value={form.ai_appointment_confirmation_text}
+                onChange={(e) => onField("ai_appointment_confirmation_text", e.target.value)}
+                placeholder="Example: I will call you from 999-999-9999."
+                maxLength={220}
+                className="w-full rounded border border-border px-3 py-2 text-sm"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Appended to AI confirmation messages after an appointment is confirmed.
+              </span>
+            </label>
 
             <div className="mt-3 grid gap-2 md:grid-cols-4">
               <input
@@ -1288,15 +1337,15 @@ export default function SettingsPage() {
                 placeholder="Question"
                 className="rounded border border-border px-3 py-2 text-sm md:col-span-2"
               />
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={newFaqPriority}
-                onChange={(e) => setNewFaqPriority(e.target.value)}
-                placeholder="Priority"
-                className="rounded border border-border px-3 py-2 text-sm"
-              />
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={newFaqPriority}
+                  onChange={(e) => setNewFaqPriority(e.target.value)}
+                  placeholder="Priority (1-99)"
+                  className="rounded border border-border px-3 py-2 text-sm"
+                />
               <button
                 type="button"
                 onClick={() => createFaq().catch((e) => setError(String(e?.message || "FAQ create failed")))}
@@ -1380,10 +1429,10 @@ export default function SettingsPage() {
                 <input
                   type="number"
                   min={1}
-                  max={999}
+                  max={99}
                   value={newAdminFaqPriority}
                   onChange={(e) => setNewAdminFaqPriority(e.target.value)}
-                  placeholder="Priority"
+                  placeholder="Priority (1-99)"
                   className="rounded border border-border px-3 py-2 text-sm"
                 />
                 <button
@@ -1581,6 +1630,148 @@ export default function SettingsPage() {
                 className="rounded bg-cyan-600 px-3 py-2 text-xs font-medium text-white hover:bg-cyan-500/100 disabled:opacity-60"
               >
                 {textdripModalSaving ? "Running..." : "Save + Run Check"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {quoteModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-6 md:pt-10">
+          <button
+            type="button"
+            aria-label="Close quote options modal"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => {
+              if (!saving) setQuoteModalOpen(false);
+            }}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded border border-border/70 bg-card/90 p-4 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-medium text-foreground">Quote Options</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!saving) setQuoteModalOpen(false);
+                }}
+                className="rounded border border-border px-2 py-1 text-xs hover:bg-muted/40"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              These settings deterministically override default quote spread rules for this user only.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded border border-border/70 bg-muted/30 p-3">
+                <div>
+                  <span className="mb-1 block text-foreground font-medium">Allow AI to Quote</span>
+                  <p className="text-xs text-muted-foreground">
+                    Uses age chart base rates with your custom range deviations below.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onField("ai_allow_quote", !form.ai_allow_quote)}
+                  className={`rounded px-3 py-2 text-sm ${
+                    form.ai_allow_quote
+                      ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                      : "border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
+                  }`}
+                >
+                  {form.ai_allow_quote ? "Enabled" : "Disabled"}
+                </button>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="mb-1 block text-muted-foreground">Individual Deviation (+/-)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5000}
+                    value={form.ai_quote_deviation_single}
+                    onChange={(e) => onField("ai_quote_deviation_single", normalizeQuoteDeviation(e.target.value, 100, 5000))}
+                    className="w-full rounded border border-border px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-muted-foreground">Couple Deviation (+/-)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5000}
+                    value={form.ai_quote_deviation_couple}
+                    onChange={(e) => onField("ai_quote_deviation_couple", normalizeQuoteDeviation(e.target.value, 150, 5000))}
+                    className="w-full rounded border border-border px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="mb-1 block text-muted-foreground">Extra Dependent Deviation (+/- per person after 2)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={form.ai_quote_deviation_per_dependent}
+                    onChange={(e) =>
+                      onField("ai_quote_deviation_per_dependent", normalizeQuoteDeviation(e.target.value, 25, 1000))
+                    }
+                    className="w-full rounded border border-border px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+
+              <div className="rounded border border-border/70 bg-muted/30 p-3">
+                <span className="mb-1 block text-foreground font-medium">Appointment Time Rule</span>
+                <p className="text-xs text-muted-foreground">
+                  Choose whether AI accepts client-suggested times directly or counters with two alternatives.
+                </p>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => onField("ai_schedule_time_mode", "offer_two_times")}
+                    className={`rounded border px-3 py-2 text-xs ${
+                      form.ai_schedule_time_mode === "offer_two_times"
+                        ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100"
+                        : "border-border text-muted-foreground hover:bg-muted/40"
+                    }`}
+                  >
+                    Offer Two Alternatives
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onField("ai_schedule_time_mode", "accept_client_time")}
+                    className={`rounded border px-3 py-2 text-xs ${
+                      form.ai_schedule_time_mode === "accept_client_time"
+                        ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100"
+                        : "border-border text-muted-foreground hover:bg-muted/40"
+                    }`}
+                  >
+                    Accept Client Time
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!saving) setQuoteModalOpen(false);
+                }}
+                disabled={saving}
+                className="rounded border border-border px-3 py-2 text-xs hover:bg-muted/40 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => onSaveQuoteOptions().catch((e) => setError(String(e?.message || "Save failed")))}
+                disabled={saving}
+                className="rounded bg-cyan-600 px-3 py-2 text-xs font-medium text-white hover:bg-cyan-500/100 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Quote Options"}
               </button>
             </div>
           </div>

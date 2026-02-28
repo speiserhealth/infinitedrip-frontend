@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/apiFetch";
 
-type LeadStatus = "engaged" | "cold" | "booked" | "sold" | "dead";
+type LeadStatus = "engaged" | "cold" | "booked" | "missed_appointment" | "sold" | "dead";
 
 type Lead = {
   id: number;
@@ -29,12 +29,13 @@ type Lead = {
   archived?: number | null;
 };
 
-const COLUMNS: LeadStatus[] = ["engaged", "cold", "booked", "sold", "dead"];
+const COLUMNS: LeadStatus[] = ["engaged", "cold", "booked", "missed_appointment", "sold", "dead"];
 
 const STATUS_LABEL: Record<LeadStatus, string> = {
   engaged: "Engaged",
   cold: "Cold",
   booked: "Booked",
+  missed_appointment: "Missed Appointment",
   sold: "Sold",
   dead: "Dead",
 };
@@ -43,6 +44,7 @@ const COL_STYLE: Record<LeadStatus, string> = {
   engaged: "bg-amber-500/10 border-amber-400/35",
   cold: "bg-cyan-500/10 border-cyan-400/35",
   booked: "bg-emerald-500/10 border-emerald-400/35",
+  missed_appointment: "bg-fuchsia-500/10 border-fuchsia-400/35",
   sold: "bg-indigo-500/10 border-indigo-400/35",
   dead: "bg-rose-500/10 border-rose-400/35",
 };
@@ -50,7 +52,7 @@ const COL_STYLE: Record<LeadStatus, string> = {
 function normalizeStatus(s: any): LeadStatus {
   const v = String(s || "engaged").toLowerCase();
   if (v === "new" || v === "contacted" || v === "engaged") return "engaged";
-  if (v === "booked" || v === "sold" || v === "cold" || v === "dead") return v;
+  if (v === "booked" || v === "missed_appointment" || v === "sold" || v === "cold" || v === "dead") return v;
   return "engaged";
 }
 
@@ -190,6 +192,7 @@ export default function PipelinePage() {
     engaged: "30",
     cold: "30",
     booked: "30",
+    missed_appointment: "30",
     sold: "30",
     dead: "30",
   });
@@ -387,7 +390,10 @@ export default function PipelinePage() {
 
       {error && <div className="mb-3 text-sm text-rose-400">{error}</div>}
 
-      <div className="flex-1 grid grid-cols-5 gap-4 overflow-x-auto">
+      <div
+        className="flex-1 grid gap-4 overflow-x-auto"
+        style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(260px, 1fr))` }}
+      >
         {COLUMNS.map((col) => {
           const isOver = dragOver === col;
 
