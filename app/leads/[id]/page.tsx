@@ -135,35 +135,82 @@ const AUTO_FOLLOWUP_DELAY_OPTIONS = [
   { value: 10080, label: "7 days" },
 ];
 
-const APPOINTMENT_REMINDER_MAX_MINUTES = 7 * 24 * 60;
+function normalizeReminderClockToken(input: string): string {
+  const raw = String(input || "").trim().toUpperCase();
+  if (!raw) return "";
 
-function parseAppointmentReminderOffsets(raw: unknown): number[] {
+  const m24 = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (m24) {
+    const hh = String(Number(m24[1])).padStart(2, "0");
+    const mm = String(m24[2]).padStart(2, "0");
+    return `clock:${hh}:${mm}`;
+  }
+
+  const m12 = raw.match(/^(\d{1,2}):([0-5]\d)\s*(AM|PM)$/);
+  if (!m12) return "";
+  let hour = Number(m12[1] || 0);
+  const minute = Number(m12[2] || 0);
+  const ampm = String(m12[3] || "");
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12) return "";
+  if (ampm === "PM" && hour !== 12) hour += 12;
+  if (ampm === "AM" && hour === 12) hour = 0;
+  return `clock:${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeReminderEntryToken(input: unknown): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  const explicitClock = raw.match(/^clock:([01]?\d|2[0-3]):([0-5]\d)$/i);
+  if (explicitClock) {
+    const hh = String(Number(explicitClock[1])).padStart(2, "0");
+    const mm = String(explicitClock[2]).padStart(2, "0");
+    return `clock:${hh}:${mm}`;
+  }
+  const explicitOffset = raw.match(/^offset:(\d+)$/i);
+  if (explicitOffset) return `offset:${Math.floor(Number(explicitOffset[1]))}`;
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) return `offset:${Math.floor(numeric)}`;
+  return normalizeReminderClockToken(raw);
+}
+
+function parseAppointmentReminderOffsets(raw: unknown): string[] {
   const values = Array.isArray(raw)
     ? raw
     : String(raw || "")
         .split(/[,\s;]+/)
         .filter(Boolean);
-  const out: number[] = [];
+  const out: string[] = [];
   for (const v of values) {
-    const n = Number(v);
-    if (!Number.isFinite(n)) continue;
-    const m = Math.floor(n);
-    if (m >= 1 && m <= APPOINTMENT_REMINDER_MAX_MINUTES) out.push(m);
+    const token = normalizeReminderEntryToken(v);
+    if (token) out.push(token);
   }
-  return Array.from(new Set(out)).sort((a, b) => a - b);
+  return Array.from(new Set(out)).sort();
 }
 
-function formatAppointmentReminderOffsetLabel(minutes: number) {
-  const m = Math.max(1, Math.floor(Number(minutes || 0)));
-  if (m % (24 * 60) === 0) {
-    const days = Math.floor(m / (24 * 60));
-    return `${days} day${days === 1 ? "" : "s"} before`;
+function formatAppointmentReminderOffsetLabel(token: string) {
+  const t = String(token || "").trim();
+  const clock = t.match(/^clock:([01]\d|2[0-3]):([0-5]\d)$/i);
+  if (clock) {
+    const hh = Number(clock[1]);
+    const mm = Number(clock[2]);
+    const ampm = hh >= 12 ? "PM" : "AM";
+    const hour12 = ((hh + 11) % 12) + 1;
+    return `${hour12}:${String(mm).padStart(2, "0")} ${ampm}`;
   }
-  if (m % 60 === 0) {
-    const hours = Math.floor(m / 60);
-    return `${hours} hour${hours === 1 ? "" : "s"} before`;
+  const off = t.match(/^offset:(\d+)$/i);
+  if (off) {
+    const minutes = Math.max(1, Math.floor(Number(off[1])));
+    if (minutes % (24 * 60) === 0) {
+      const days = Math.floor(minutes / (24 * 60));
+      return `${days} day${days === 1 ? "" : "s"} before (legacy)`;
+    }
+    if (minutes % 60 === 0) {
+      const hours = Math.floor(minutes / 60);
+      return `${hours} hour${hours === 1 ? "" : "s"} before (legacy)`;
+    }
+    return `${minutes} min before (legacy)`;
   }
-  return `${m} min before`;
+  return t;
 }
 
 function formatTime(raw?: string | null) {
@@ -335,9 +382,12 @@ export default function LeadThreadPage() {
   const [autoFollowupDraftDirty, setAutoFollowupDraftDirty] = React.useState(false);
   const [autoFollowupDraft, setAutoFollowupDraft] = React.useState<AutoFollowupConfig | null>(null);
   const [appointmentRemindersEnabled, setAppointmentRemindersEnabled] = React.useState(false);
-  const [appointmentReminderOffsets, setAppointmentReminderOffsets] = React.useState<number[]>([]);
-  const [appointmentReminderValue, setAppointmentReminderValue] = React.useState("15");
-  const [appointmentReminderUnit, setAppointmentReminderUnit] = React.useState<"minutes" | "hours" | "days">("minutes");
+  const [appointmentReminderOffsets, setAppointmentReminderOffsets] = React.useState<string[]>([]);
+  const [appointmentReminderValue, setAppointmentReminderValue] = React.useState("8:45AM");
+  const [showAutoFollowupDefaultsSetup, setShowAutoFollowupDefaultsSetup] = React.useState(false);
+  const [autoFollowupDefaultsDraft, setAutoFollowupDefaultsDraft] = React.useState<AutoFollowupConfig>(DEFAULT_AUTO_FOLLOWUP_CONFIG);
+  const [loadingAutoFollowupDefaults, setLoadingAutoFollowupDefaults] = React.useState(false);
+  const [savingAutoFollowupDefaults, setSavingAutoFollowupDefaults] = React.useState(false);
   const [updatingHot, setUpdatingHot] = React.useState(false);
   const [updatingArchive, setUpdatingArchive] = React.useState(false);
   const [updatingDnc, setUpdatingDnc] = React.useState(false);
@@ -865,20 +915,89 @@ export default function LeadThreadPage() {
   }
 
   function addAppointmentReminderOffset() {
-    const raw = Number(appointmentReminderValue || "0");
-    if (!Number.isFinite(raw) || raw <= 0) return;
-    const minutes = appointmentReminderUnit === "days"
-      ? Math.floor(raw * 24 * 60)
-      : appointmentReminderUnit === "hours"
-        ? Math.floor(raw * 60)
-        : Math.floor(raw);
-    if (!Number.isFinite(minutes) || minutes < 1 || minutes > APPOINTMENT_REMINDER_MAX_MINUTES) return;
-    setAppointmentReminderOffsets((prev) => Array.from(new Set([...prev, minutes])).sort((a, b) => a - b));
+    const token = normalizeReminderEntryToken(appointmentReminderValue);
+    if (!token) return;
+    setAppointmentReminderOffsets((prev) => Array.from(new Set([...prev, token])).sort());
+    setAppointmentReminderValue("");
   }
 
-  function removeAppointmentReminderOffset(minutes: number) {
-    const m = Math.max(1, Math.floor(Number(minutes || 0)));
-    setAppointmentReminderOffsets((prev) => prev.filter((x) => Number(x) !== m));
+  function removeAppointmentReminderOffset(token: string) {
+    const normalized = normalizeReminderEntryToken(token);
+    if (!normalized) return;
+    setAppointmentReminderOffsets((prev) => prev.filter((x) => x !== normalized));
+  }
+
+  async function openAutoFollowupDefaultsSetup() {
+    try {
+      setLoadingAutoFollowupDefaults(true);
+      const r = await apiFetch(`${API_BASE}/api/auto-followup/defaults`, { cache: "no-store" });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setAutoFollowupDefaultsDraft(normalizeAutoFollowupConfig(body?.config || {}));
+      }
+      setShowAutoFollowupDefaultsSetup(true);
+    } catch {
+      setAutoFollowupDefaultsDraft(normalizeAutoFollowupConfig({}));
+      setShowAutoFollowupDefaultsSetup(true);
+    } finally {
+      setLoadingAutoFollowupDefaults(false);
+    }
+  }
+
+  function updateAutoFollowupDefaultRule(
+    key: keyof AutoFollowupConfig,
+    patch: Partial<AutoFollowupRule>
+  ) {
+    setAutoFollowupDefaultsDraft((prev) => {
+      const base = normalizeAutoFollowupConfig(prev);
+      const nextRule = {
+        ...base[key],
+        ...patch,
+      };
+      if (patch.delay_minutes !== undefined) {
+        nextRule.delay_minutes = clampDelayMinutes(patch.delay_minutes, base[key].delay_minutes);
+      }
+      if (patch.message !== undefined) {
+        nextRule.message = String(patch.message || "").slice(0, 480);
+      }
+      return {
+        ...base,
+        [key]: nextRule,
+      };
+    });
+  }
+
+  async function saveAutoFollowupDefaultsSetup() {
+    try {
+      setSavingAutoFollowupDefaults(true);
+      const r = await apiFetch(`${API_BASE}/api/auto-followup/defaults`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: autoFollowupDefaultsDraft,
+          apply_to_all: true,
+        }),
+      });
+      if (!r.ok) throw new Error("Save failed");
+      const body = await r.json().catch(() => ({}));
+      const normalized = normalizeAutoFollowupConfig(body?.config || autoFollowupDefaultsDraft);
+      setAutoFollowupDefaultsDraft(normalized);
+      setAutoFollowupConfig(normalized);
+      setAutoFollowupDraft(normalizeAutoFollowupConfig(normalized));
+      setLead((prev) =>
+        prev
+          ? {
+              ...prev,
+              auto_followup_config: JSON.stringify(normalized),
+            }
+          : prev
+      );
+      setShowAutoFollowupDefaultsSetup(false);
+    } catch {
+      alert("Automatic follow-up defaults save failed");
+    } finally {
+      setSavingAutoFollowupDefaults(false);
+    }
   }
 
   async function saveAppointmentReminders() {
@@ -890,7 +1009,7 @@ export default function LeadThreadPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: appointmentRemindersEnabled,
-          offsets: appointmentReminderOffsets,
+          times: appointmentReminderOffsets,
         }),
       });
       if (!r.ok) throw new Error("Appointment reminders save failed");
@@ -1278,6 +1397,7 @@ export default function LeadThreadPage() {
                 setAutoFollowupDraft(normalizeAutoFollowupConfig(autoFollowupConfig));
                 autoFollowupDraftDirtyRef.current = false;
                 setAutoFollowupDraftDirty(false);
+                setShowAutoFollowupDefaultsSetup(false);
                 setShowAutoFollowupModal(true);
               }}
               disabled={updatingAutoFollowup}
@@ -1551,7 +1671,18 @@ export default function LeadThreadPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-border/80 bg-slate-900 p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-base font-semibold">Automatic Followup</div>
+              <div className="flex items-center gap-2">
+                <div className="text-base font-semibold">Automatic Followup</div>
+                <button
+                  type="button"
+                  onClick={openAutoFollowupDefaultsSetup}
+                  disabled={loadingAutoFollowupDefaults}
+                  className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-200"
+                  title="Set default automatic follow-up rules for all leads"
+                >
+                  {loadingAutoFollowupDefaults ? "Loading..." : "Setup"}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1559,6 +1690,7 @@ export default function LeadThreadPage() {
                   autoFollowupDraftDirtyRef.current = false;
                   setAutoFollowupDraftDirty(false);
                   setShowAutoFollowupModal(false);
+                  setShowAutoFollowupDefaultsSetup(false);
                 }}
                 className="rounded border border-border px-3 py-1 text-sm"
               >
@@ -1570,12 +1702,82 @@ export default function LeadThreadPage() {
               Countdown tracking is internal and resets when the lead replies.
             </div>
 
+            {showAutoFollowupDefaultsSetup ? (
+              <div className="mb-3 rounded border border-cyan-400/40 bg-cyan-500/10 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-cyan-100">Default for All Leads</div>
+                    <div className="text-xs text-cyan-200/80">
+                      Save once to apply as your account-wide baseline. Per-lead edits can still override.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={saveAutoFollowupDefaultsSetup}
+                    disabled={savingAutoFollowupDefaults}
+                    className="rounded border border-emerald-400/40 bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-500 disabled:opacity-70"
+                  >
+                    {savingAutoFollowupDefaults ? "Saving..." : "Save Defaults"}
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {AUTO_FOLLOWUP_RULE_META.map(({ key, title }) => {
+                    const rule = autoFollowupDefaultsDraft[key];
+                    return (
+                      <div key={`defaults_${key}`} className="rounded border border-cyan-300/20 bg-slate-900/40 p-2.5">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <div className="text-xs font-medium text-cyan-100">{title}</div>
+                          <button
+                            type="button"
+                            onClick={() => updateAutoFollowupDefaultRule(key, { enabled: !rule.enabled })}
+                            className={`rounded border px-2 py-0.5 text-[11px] ${
+                              rule.enabled
+                                ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                                : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                            }`}
+                          >
+                            {rule.enabled ? "Enabled" : "Disabled"}
+                          </button>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-[170px_1fr]">
+                          <select
+                            value={rule.delay_minutes}
+                            onChange={(e) =>
+                              updateAutoFollowupDefaultRule(key, {
+                                delay_minutes: clampDelayMinutes(e.target.value, rule.delay_minutes),
+                              })
+                            }
+                            className="rounded border px-2 py-1.5 text-xs"
+                          >
+                            {AUTO_FOLLOWUP_DELAY_OPTIONS.map((opt) => (
+                              <option key={`def_${key}_${opt.value}`} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            value={rule.message}
+                            onChange={(e) =>
+                              updateAutoFollowupDefaultRule(key, {
+                                message: String(e.target.value || "").slice(0, 480),
+                              })
+                            }
+                            className="rounded border px-2 py-1.5 text-xs"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mb-3 rounded border border-border/70 bg-card/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div>
                   <div className="text-sm font-medium">Auto-text Appointment Reminders</div>
                   <div className="text-xs text-muted-foreground">
-                    Independent from Automatic Followup. Uses customer timezone when available.
+                    Independent from Automatic Followup. Add specific reminder times like 8:45AM.
                   </div>
                 </div>
                 <button
@@ -1611,22 +1813,12 @@ export default function LeadThreadPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <input
-                  type="number"
-                  min={1}
-                  max={10080}
+                  type="text"
                   value={appointmentReminderValue}
                   onChange={(e) => setAppointmentReminderValue(e.target.value)}
+                  placeholder="8:45AM"
                   className="w-24 rounded border px-2 py-1.5 text-sm"
                 />
-                <select
-                  value={appointmentReminderUnit}
-                  onChange={(e) => setAppointmentReminderUnit(e.target.value as "minutes" | "hours" | "days")}
-                  className="rounded border px-2 py-1.5 text-sm"
-                >
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
-                </select>
                 <button
                   type="button"
                   onClick={addAppointmentReminderOffset}
