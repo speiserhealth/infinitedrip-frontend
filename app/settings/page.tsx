@@ -21,6 +21,7 @@ type SettingsResponse = {
     ai_quiet_hours_end?: string;
     ai_max_replies_per_5m?: number;
     ai_reply_cooldown_minutes?: number;
+    ai_reply_cooldown_seconds?: number;
     appointment_reminders_enabled?: boolean;
     appointment_reminder_offsets?: number[] | string;
     google_calendar_id?: string;
@@ -44,7 +45,7 @@ type FormState = {
   ai_quiet_hours_start: string;
   ai_quiet_hours_end: string;
   ai_max_replies_per_5m: string;
-  ai_reply_cooldown_minutes: string;
+  ai_reply_cooldown_seconds: string;
   appointment_reminders_enabled: boolean;
   appointment_reminder_offsets: string[];
   google_calendar_id: string;
@@ -120,7 +121,7 @@ const INITIAL_FORM: FormState = {
   ai_quiet_hours_start: "22:00",
   ai_quiet_hours_end: "08:00",
   ai_max_replies_per_5m: "20",
-  ai_reply_cooldown_minutes: "2",
+  ai_reply_cooldown_seconds: "60",
   appointment_reminders_enabled: false,
   appointment_reminder_offsets: [],
   google_calendar_id: "",
@@ -170,6 +171,14 @@ function normalizeReminderOffsets(raw: unknown): string[] {
     if (m === 15 || m === 30 || m === 60) set.add(String(m));
   }
   return Array.from(set).sort((a, b) => Number(a) - Number(b));
+}
+
+function normalizeCooldownSeconds(raw: unknown): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return "60";
+  if (n <= 30) return "15";
+  if (n >= 300) return "300";
+  return "60";
 }
 
 export default function SettingsPage() {
@@ -250,8 +259,8 @@ export default function SettingsPage() {
         ai_quiet_hours_start: String(s.ai_quiet_hours_start || "22:00"),
         ai_quiet_hours_end: String(s.ai_quiet_hours_end || "08:00"),
         ai_max_replies_per_5m: String(clampMaxReplies(String(s.ai_max_replies_per_5m ?? "20"))),
-        ai_reply_cooldown_minutes: String(
-          Math.max(0, Math.min(120, Math.floor(Number(s.ai_reply_cooldown_minutes ?? 2) || 2)))
+        ai_reply_cooldown_seconds: normalizeCooldownSeconds(
+          s.ai_reply_cooldown_seconds ?? (Number(s.ai_reply_cooldown_minutes || 2) * 60)
         ),
         appointment_reminders_enabled: !!s.appointment_reminders_enabled,
         appointment_reminder_offsets: normalizeReminderOffsets(s.appointment_reminder_offsets),
@@ -659,6 +668,7 @@ export default function SettingsPage() {
   }
 
   function buildSettingsPayload() {
+    const cooldownSeconds = Number(form.ai_reply_cooldown_seconds || "60");
     const payload: Record<string, unknown> = {
       textdrip_base_url: form.textdrip_base_url,
       ai_first_reply_mode: form.ai_first_reply_mode,
@@ -668,10 +678,8 @@ export default function SettingsPage() {
       ai_quiet_hours_start: form.ai_quiet_hours_start,
       ai_quiet_hours_end: form.ai_quiet_hours_end,
       ai_max_replies_per_5m: clampMaxReplies(form.ai_max_replies_per_5m),
-      ai_reply_cooldown_minutes: Math.max(
-        0,
-        Math.min(120, Math.floor(Number(form.ai_reply_cooldown_minutes || "2") || 2))
-      ),
+      ai_reply_cooldown_seconds: Math.max(0, Math.min(7200, Math.floor(cooldownSeconds || 60))),
+      ai_reply_cooldown_minutes: Math.max(0, Math.min(120, Math.floor((cooldownSeconds || 60) / 60))),
       appointment_reminders_enabled: !!form.appointment_reminders_enabled,
       appointment_reminder_offsets: normalizeReminderOffsets(form.appointment_reminder_offsets).map((x) => Number(x)),
       google_calendar_id: form.google_calendar_id,
@@ -966,15 +974,16 @@ export default function SettingsPage() {
               </div>
 
               <label className="block text-sm">
-                <span className="mb-1 block text-muted-foreground">AI Reply Cooldown (minutes)</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={120}
-                  value={form.ai_reply_cooldown_minutes}
-                  onChange={(e) => onField("ai_reply_cooldown_minutes", e.target.value)}
+                <span className="mb-1 block text-muted-foreground">AI Reply Cooldown</span>
+                <select
+                  value={form.ai_reply_cooldown_seconds}
+                  onChange={(e) => onField("ai_reply_cooldown_seconds", e.target.value)}
                   className="w-full rounded border border-border px-3 py-2 text-sm"
-                />
+                >
+                  <option value="15">Seconds</option>
+                  <option value="60">1 minute</option>
+                  <option value="300">5 minutes</option>
+                </select>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Prevents immediate back-to-back AI auto replies for the same lead.
                 </p>

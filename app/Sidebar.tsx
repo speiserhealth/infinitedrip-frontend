@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/apiFetch";
 
 const baseNavItems = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/leads", label: "Leads" },
   { href: "/pipeline", label: "Funnel" },
   { href: "/stats", label: "Stats" },
