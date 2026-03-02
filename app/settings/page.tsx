@@ -33,6 +33,10 @@ type SettingsResponse = {
     google_refresh_token_set?: boolean;
     google_account_email?: string;
     google_account_email_set?: boolean;
+    gmail_lead_import_enabled?: boolean;
+    gmail_lead_import_query?: string;
+    gmail_lead_import_auto_text_enabled?: boolean;
+    gmail_lead_import_auto_text_template?: string;
     updated_at?: string | null;
   };
 };
@@ -58,6 +62,10 @@ type FormState = {
   google_client_id: string;
   google_client_secret: string;
   google_refresh_token: string;
+  gmail_lead_import_enabled: boolean;
+  gmail_lead_import_query: string;
+  gmail_lead_import_auto_text_enabled: boolean;
+  gmail_lead_import_auto_text_template: string;
 };
 
 type AiFaqRow = {
@@ -80,6 +88,24 @@ type CalendarStatus = {
   detail?: string;
   calendar_id?: string;
   next_event_at?: string | null;
+  checked_at?: string;
+};
+
+type GmailLeadImportStatus = {
+  access_granted?: boolean;
+  configured?: boolean;
+  connected?: boolean;
+  enabled?: boolean;
+  query?: string;
+  source_hints?: {
+    from?: string[];
+    subject?: string[];
+  };
+  auto_text_enabled?: boolean;
+  auto_text_template_set?: boolean;
+  warning?: string;
+  detail?: string;
+  recent_imports_24h?: number;
   checked_at?: string;
 };
 
@@ -137,6 +163,10 @@ const INITIAL_FORM: FormState = {
   google_client_id: "",
   google_client_secret: "",
   google_refresh_token: "",
+  gmail_lead_import_enabled: false,
+  gmail_lead_import_query: "in:inbox newer_than:14d",
+  gmail_lead_import_auto_text_enabled: false,
+  gmail_lead_import_auto_text_template: "",
 };
 
 const INITIAL_TEXTDRIP_SETUP: TextdripSetupState = {
@@ -214,6 +244,9 @@ export default function SettingsPage() {
   const [webhookUrl, setWebhookUrl] = React.useState("");
   const [calendarStatus, setCalendarStatus] = React.useState<CalendarStatus | null>(null);
   const [checkingCalendar, setCheckingCalendar] = React.useState(false);
+  const [gmailLeadImportStatus, setGmailLeadImportStatus] = React.useState<GmailLeadImportStatus | null>(null);
+  const [checkingGmailLeadImportStatus, setCheckingGmailLeadImportStatus] = React.useState(false);
+  const [runningGmailLeadImport, setRunningGmailLeadImport] = React.useState(false);
   const [checkingTextdrip, setCheckingTextdrip] = React.useState(false);
   const [runningTextdripWizard, setRunningTextdripWizard] = React.useState(false);
   const [textdripSetup, setTextdripSetup] = React.useState<TextdripSetupState>(INITIAL_TEXTDRIP_SETUP);
@@ -298,6 +331,10 @@ export default function SettingsPage() {
         google_client_id: String(s.google_client_id || ""),
         google_client_secret: "",
         google_refresh_token: "",
+        gmail_lead_import_enabled: !!s.gmail_lead_import_enabled,
+        gmail_lead_import_query: String(s.gmail_lead_import_query || "in:inbox newer_than:14d"),
+        gmail_lead_import_auto_text_enabled: !!s.gmail_lead_import_auto_text_enabled,
+        gmail_lead_import_auto_text_template: String(s.gmail_lead_import_auto_text_template || ""),
       });
       setTextdripDraft((prev) => ({
         ...prev,
@@ -335,6 +372,7 @@ export default function SettingsPage() {
     loadSettings();
     loadFaqs().catch(() => {});
     loadCalendarStatus().catch(() => {});
+    loadGmailLeadImportStatus().catch(() => {});
     loadTextdripSetupStatus().catch(() => {});
   }, []);
 
@@ -461,6 +499,54 @@ export default function SettingsPage() {
       setCalendarStatus((body?.status || null) as CalendarStatus | null);
     } finally {
       setCheckingCalendar(false);
+    }
+  }
+
+  async function loadGmailLeadImportStatus() {
+    setCheckingGmailLeadImportStatus(true);
+    try {
+      const res = await apiFetch("/api/integrations/gmail-leads/status", { cache: "no-store" });
+      if (res.status === 403) {
+        setGmailLeadImportStatus({
+          access_granted: false,
+          warning: "Access not granted. Ask an admin to enable Email Lead Import for your account.",
+          checked_at: new Date().toISOString(),
+        });
+        return;
+      }
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Gmail lead import status failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const body = await res.json().catch(() => ({}));
+      setGmailLeadImportStatus((body?.status || null) as GmailLeadImportStatus | null);
+    } finally {
+      setCheckingGmailLeadImportStatus(false);
+    }
+  }
+
+  async function runGmailLeadImport() {
+    setRunningGmailLeadImport(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch("/api/integrations/gmail-leads/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 30, dry_run: false }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Gmail lead import failed (${res.status}): ${txt || "Unknown error"}`);
+      }
+      const body = await res.json().catch(() => ({}));
+      const result = body?.result || {};
+      setSuccess(
+        `Email lead import completed. Scanned ${Number(result?.scanned || 0)}, imported ${Number(result?.imported || 0)}, ignored ${Number(result?.skipped_nonlead || 0)}.`
+      );
+      await loadGmailLeadImportStatus().catch(() => {});
+    } finally {
+      setRunningGmailLeadImport(false);
     }
   }
 
@@ -732,6 +818,10 @@ export default function SettingsPage() {
       ai_reply_cooldown_minutes: Math.max(0, Math.min(120, Math.floor((cooldownSeconds || 60) / 60))),
       google_calendar_id: form.google_calendar_id,
       google_client_id: form.google_client_id,
+      gmail_lead_import_enabled: !!form.gmail_lead_import_enabled,
+      gmail_lead_import_query: String(form.gmail_lead_import_query || "").trim(),
+      gmail_lead_import_auto_text_enabled: !!form.gmail_lead_import_auto_text_enabled,
+      gmail_lead_import_auto_text_template: String(form.gmail_lead_import_auto_text_template || "").trim(),
     };
     if (form.textdrip_api_token.trim()) payload.textdrip_api_token = form.textdrip_api_token;
     if (form.textdrip_webhook_secret.trim()) payload.textdrip_webhook_secret = form.textdrip_webhook_secret;
@@ -753,6 +843,7 @@ export default function SettingsPage() {
     }
     await loadSettings();
     await loadCalendarStatus().catch(() => {});
+    await loadGmailLeadImportStatus().catch(() => {});
     await loadTextdripSetupStatus().catch(() => {});
   }
 

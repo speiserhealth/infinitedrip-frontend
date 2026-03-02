@@ -10,6 +10,8 @@ type LeadStatus = "engaged" | "cold" | "booked" | "missed_appointment" | "sold" 
 type Lead = {
   id: number;
   name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   phone?: string | null;
   email?: string | null;
   city?: string | null;
@@ -31,6 +33,8 @@ type Lead = {
   hot?: number | null;
   archived?: number | null;
   dnc?: number | null;
+  lead_snapshot_json?: string | null;
+  lead_snapshot_updated_at?: string | null;
 };
 
 type Msg = {
@@ -221,6 +225,53 @@ function formatTime(raw?: string | null) {
   return d.toLocaleString();
 }
 
+function parseLeadSnapshot(raw?: string | null) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+function displayFieldValue(value: unknown) {
+  const s = String(value ?? "").trim();
+  return s || "-";
+}
+
+function formatIncomeValue(value: unknown) {
+  const digits = String(value ?? "").replace(/[^\d]/g, "");
+  if (!digits) return "-";
+  return Number(digits).toLocaleString();
+}
+
+function getSnapshotLeadInfo(snapshot: any) {
+  const extracted = snapshot?.extracted_lead || {};
+  return {
+    name: displayFieldValue(extracted?.name),
+    first_name: displayFieldValue(extracted?.first_name),
+    last_name: displayFieldValue(extracted?.last_name),
+    email: displayFieldValue(extracted?.email),
+    phone: displayFieldValue(extracted?.phone),
+    address: displayFieldValue(extracted?.address),
+    city: displayFieldValue(extracted?.city),
+    state: displayFieldValue(extracted?.state),
+    zip: displayFieldValue(extracted?.zip),
+    lead_timezone: displayFieldValue(extracted?.lead_timezone),
+    dob: displayFieldValue(extracted?.dob),
+    gender: displayFieldValue(extracted?.gender),
+    height: displayFieldValue(extracted?.height),
+    weight: displayFieldValue(extracted?.weight),
+    annual_household_income: formatIncomeValue(extracted?.annual_household_income),
+    qualifying_event: displayFieldValue(extracted?.qualifying_event),
+    family_size: displayFieldValue(extracted?.family_size),
+    coverage_type: displayFieldValue(extracted?.coverage_type),
+    is_medicare: displayFieldValue(extracted?.is_medicare),
+    custom_lead_type_name: displayFieldValue(extracted?.custom_lead_type_name),
+  };
+}
+
 function addMinutesToLocalInput(localValue: string, minutes: number) {
   const d = new Date(localValue);
   if (Number.isNaN(d.getTime())) return "";
@@ -378,6 +429,7 @@ export default function LeadThreadPage() {
   const [updatingLeadAca, setUpdatingLeadAca] = React.useState(false);
   const [updatingAutoFollowup, setUpdatingAutoFollowup] = React.useState(false);
   const [updatingAppointmentReminders, setUpdatingAppointmentReminders] = React.useState(false);
+  const [showLeadSnapshot, setShowLeadSnapshot] = React.useState(false);
   const [showAutoFollowupModal, setShowAutoFollowupModal] = React.useState(false);
   const [autoFollowupDraftDirty, setAutoFollowupDraftDirty] = React.useState(false);
   const [autoFollowupDraft, setAutoFollowupDraft] = React.useState<AutoFollowupConfig | null>(null);
@@ -1165,6 +1217,8 @@ export default function LeadThreadPage() {
   const leadTz = String(lead?.lead_timezone || "").trim();
   const leadLocation = [[leadCity, leadState].filter(Boolean).join(", "), leadZip].filter(Boolean).join(" ").trim();
   const leadLocationLine = [leadLocation, leadTz ? `(${leadTz})` : ""].filter(Boolean).join(" ");
+  const leadSnapshot = parseLeadSnapshot(lead?.lead_snapshot_json || "");
+  const snapshotLeadInfo = getSnapshotLeadInfo(leadSnapshot);
   const autoFollowupModalConfig = autoFollowupDraft || autoFollowupConfig;
 
   function updateAutoFollowupRule(
@@ -1270,11 +1324,97 @@ export default function LeadThreadPage() {
           >
             {archived ? "Unarchive" : "Archive"}
           </button>
+          <button
+            type="button"
+            onClick={() => setShowLeadSnapshot((prev) => !prev)}
+            className={`rounded border px-2 py-1 text-sm ${
+              showLeadSnapshot
+                ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-200"
+                : "bg-card/70 border-border text-muted-foreground"
+            }`}
+            title="Show lead information"
+          >
+            Lead Information
+          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3">
         <aside className="order-2 lg:order-2 min-h-0 overflow-y-auto pr-1 space-y-3">
+          {showLeadSnapshot ? (
+            <div className="rounded-lg border border-cyan-400/40 bg-cyan-500/10 p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-medium text-cyan-100">Lead Information</div>
+                <button
+                  type="button"
+                  onClick={() => setShowLeadSnapshot(false)}
+                  className="rounded border border-cyan-400/40 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-cyan-100/90">
+                <div className="rounded border border-cyan-400/20 bg-slate-900/20 p-2">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+                    Contact
+                  </div>
+                  <div>Name: {lead?.name || snapshotLeadInfo.name}</div>
+                  <div>First: {String(lead?.first_name || snapshotLeadInfo.first_name)}</div>
+                  <div>Last: {String(lead?.last_name || snapshotLeadInfo.last_name)}</div>
+                  <div>Phone: {lead?.phone || snapshotLeadInfo.phone}</div>
+                  <div>Email: {String(lead?.email || snapshotLeadInfo.email)}</div>
+                </div>
+                <div className="rounded border border-cyan-400/20 bg-slate-900/20 p-2">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+                    Location
+                  </div>
+                  <div>Address: {snapshotLeadInfo.address}</div>
+                  <div>City: {leadCity || snapshotLeadInfo.city}</div>
+                  <div>State: {leadState || snapshotLeadInfo.state}</div>
+                  <div>ZIP: {leadZip || snapshotLeadInfo.zip}</div>
+                  <div>Timezone: {leadTz || snapshotLeadInfo.lead_timezone}</div>
+                </div>
+                <div className="rounded border border-cyan-400/20 bg-slate-900/20 p-2">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+                    Health Details
+                  </div>
+                  <div>Date of Birth: {snapshotLeadInfo.dob}</div>
+                  <div>Gender: {snapshotLeadInfo.gender}</div>
+                  <div>Height: {snapshotLeadInfo.height}</div>
+                  <div>Weight: {snapshotLeadInfo.weight}</div>
+                </div>
+                <div className="rounded border border-cyan-400/20 bg-slate-900/20 p-2">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+                    Coverage
+                  </div>
+                  <div>Household Income: {snapshotLeadInfo.annual_household_income}</div>
+                  <div>Qualifying Event: {snapshotLeadInfo.qualifying_event}</div>
+                  <div>Family Size: {snapshotLeadInfo.family_size}</div>
+                  <div>Coverage Type: {snapshotLeadInfo.coverage_type}</div>
+                  <div>Is Medicare: {snapshotLeadInfo.is_medicare}</div>
+                </div>
+                <div className="col-span-2 rounded border border-cyan-400/20 bg-slate-900/20 p-2">
+                  <div>Custom Lead Type: {snapshotLeadInfo.custom_lead_type_name}</div>
+                  <div>
+                    Snapshot updated: {lead?.lead_snapshot_updated_at ? formatTime(lead.lead_snapshot_updated_at) : "-"}
+                  </div>
+                </div>
+              </div>
+              {leadSnapshot ? (
+                <details className="mt-2 rounded border border-cyan-400/30 bg-slate-900/35 p-2">
+                  <summary className="cursor-pointer text-xs font-medium text-cyan-200">
+                    View raw imported data
+                  </summary>
+                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] text-cyan-100/85">
+                    {JSON.stringify(leadSnapshot, null, 2)}
+                  </pre>
+                </details>
+              ) : (
+                <div className="mt-2 text-xs text-cyan-100/70">No structured snapshot saved yet for this lead.</div>
+              )}
+            </div>
+          ) : null}
+
           <div className="rounded-lg border border-rose-400/40 bg-rose-500/10 p-3 shadow-sm">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-medium text-rose-200">Do Not Contact</div>

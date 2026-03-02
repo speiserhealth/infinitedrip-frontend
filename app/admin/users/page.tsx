@@ -14,6 +14,7 @@ type UserRow = {
   approved_at?: string | null;
   billing_status?: "trial" | "active" | "past_due" | "canceled" | "none" | string;
   trial_ends_at?: string | null;
+  email_lead_import_access?: number | boolean;
 };
 
 type AdminStatus = {
@@ -205,6 +206,25 @@ export default function AdminUsersPage() {
       if (!r.ok) {
         const txt = await r.text().catch(() => "");
         throw new Error(`${action} failed (${r.status}): ${txt}`);
+      }
+      await load(tab);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function setEmailLeadImportAccess(id: number, enabled: boolean) {
+    setBusyId(id);
+    setError("");
+    try {
+      const r = await apiFetch(`/api/admin/users/${id}/email-lead-import-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        throw new Error(`Email lead import access update failed (${r.status}): ${txt}`);
       }
       await load(tab);
     } finally {
@@ -503,6 +523,9 @@ export default function AdminUsersPage() {
                   <div className="mt-1 text-xs text-muted-foreground">
                     Billing: {String(u.billing_status || "trial")} | Trial ends: {fmtDate(u.trial_ends_at) || "n/a"}
                   </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Email lead import: {Number(u.email_lead_import_access || 0) === 1 ? "enabled" : "disabled"}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-end">
@@ -569,6 +592,22 @@ export default function AdminUsersPage() {
                       Delete Pending User
                     </button>
                   ) : null}
+
+                  <button
+                    onClick={() =>
+                      setEmailLeadImportAccess(u.id, Number(u.email_lead_import_access || 0) !== 1).catch((e) =>
+                        setError(String(e?.message || "Email lead access update failed"))
+                      )
+                    }
+                    disabled={busy}
+                    className={
+                      Number(u.email_lead_import_access || 0) === 1
+                        ? "rounded bg-emerald-700 text-white text-sm px-3 py-2 hover:bg-emerald-600 disabled:opacity-60"
+                        : "rounded bg-slate-700 text-white text-sm px-3 py-2 hover:bg-slate-600 disabled:opacity-60"
+                    }
+                  >
+                    {Number(u.email_lead_import_access || 0) === 1 ? "Disable Email Lead Import" : "Enable Email Lead Import"}
+                  </button>
 
                   <button
                     onClick={() => runAction(u.id, "resend-approval-email").catch((e) => setError(String(e?.message || "Resend failed")))}
