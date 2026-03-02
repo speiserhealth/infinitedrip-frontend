@@ -401,6 +401,17 @@ function getAiSignal(lead: Lead | null, nowMs = Date.now()): AiSignal {
   };
 }
 
+function isHumanAttentionPauseReason(reasonRaw?: string | null) {
+  const reason = String(reasonRaw || "").trim().toLowerCase();
+  if (!reason) return false;
+  if (reason.includes("handoff")) return true;
+  return [
+    "state_machine_loop_guard",
+    "pre_send_loop_guard",
+    "aca_disabled_negative_quote",
+  ].includes(reason);
+}
+
 export default function LeadThreadPage() {
   const params = useParams();
   const idParam = params?.id;
@@ -467,6 +478,7 @@ export default function LeadThreadPage() {
   const lastHistorySyncAtRef = React.useRef(0);
   const historySyncInFlightRef = React.useRef(false);
   const threadLoadInFlightRef = React.useRef(false);
+  const viewedPostedLeadRef = React.useRef("");
 
   React.useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -575,6 +587,21 @@ export default function LeadThreadPage() {
       clearInterval(t);
     };
   }, [leadId, API_BASE]);
+
+  React.useEffect(() => {
+    viewedPostedLeadRef.current = "";
+  }, [leadId]);
+
+  React.useEffect(() => {
+    if (!leadId || !lead?.id) return;
+    const key = String(leadId);
+    if (viewedPostedLeadRef.current === key) return;
+    viewedPostedLeadRef.current = key;
+    void apiFetch(`${API_BASE}/api/leads/${leadId}/viewed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).catch(() => {});
+  }, [leadId, lead?.id, API_BASE]);
 
   React.useEffect(() => {
     const emailFromLead = normalizeEmail(String(lead?.email || ""));
@@ -1200,6 +1227,8 @@ export default function LeadThreadPage() {
   const statusStyle = STATUS_STYLE[currentStatus];
   const aiOn = (lead?.ai_enabled ?? 1) === 1;
   const aiSignal = React.useMemo(() => getAiSignal(lead, nowMs), [lead, nowMs]);
+  const needsHumanAttention =
+    Number(lead?.ai_paused ?? 0) === 1 && isHumanAttentionPauseReason(lead?.ai_pause_reason);
   const aiCooldownCountdown = aiSignal.tone === "yellow"
     ? String(aiSignal.label || "").replace(/^AI Cooldown\s*/, "")
     : "";
@@ -1620,6 +1649,11 @@ export default function LeadThreadPage() {
               </span>
               {aiSignal.label}
             </span>
+            {needsHumanAttention ? (
+              <span className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/15 px-2 py-1 text-xs text-rose-200">
+                🔴 Needs Human Attention
+              </span>
+            ) : null}
           </div>
 
           <div className="mb-2 flex gap-2">

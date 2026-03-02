@@ -13,6 +13,7 @@ type Lead = {
   status?: LeadStatus | string | null;
   ai_enabled?: number | null;
   ai_paused?: number | null;
+  ai_pause_reason?: string | null;
   ai_cooldown_until?: string | null;
   createdAt?: string | null;
   created_at?: string | null;
@@ -264,6 +265,17 @@ function getAiSignal(lead: Lead, nowMs = Date.now()): AiSignal {
     label: "Active",
     className: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
   };
+}
+
+function isHumanAttentionPauseReason(reasonRaw?: string | null) {
+  const reason = String(reasonRaw || "").trim().toLowerCase();
+  if (!reason) return false;
+  if (reason.includes("handoff")) return true;
+  return [
+    "state_machine_loop_guard",
+    "pre_send_loop_guard",
+    "aca_disabled_negative_quote",
+  ].includes(reason);
 }
 
 function normalizeLead(raw: any): Lead {
@@ -688,6 +700,8 @@ export default function LeadsPage() {
                 const st = normalizeStatus(l.status);
                 const cls = STATUS_STYLE[st];
                 const aiSignal = getAiSignal(l, nowMs);
+                const needsHumanAttention =
+                  Number(l?.ai_paused ?? 0) === 1 && isHumanAttentionPauseReason(l?.ai_pause_reason);
 
                 const waiting = l.lastMessageDirection === "in";
                 const hot = Number(l.inboundCount ?? 0) >= 3;
@@ -720,12 +734,19 @@ export default function LeadsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-1.5">
-                      <span className={`inline-flex items-center gap-1 border rounded px-1.5 py-0.5 text-[11px] ${aiSignal.className}`}>
-                        <span aria-hidden="true">
-                          {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"}
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className={`inline-flex items-center gap-1 border rounded px-1.5 py-0.5 text-[11px] ${aiSignal.className}`}>
+                          <span aria-hidden="true">
+                            {aiSignal.tone === "green" ? "🟢" : aiSignal.tone === "yellow" ? "🟡" : "🔴"}
+                          </span>
+                          {aiSignal.label}
                         </span>
-                        {aiSignal.label}
-                      </span>
+                        {needsHumanAttention ? (
+                          <span className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/15 px-1.5 py-0.5 text-[11px] text-rose-200">
+                            🔴 Alert
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
 
                     <td className="px-3 py-1.5">{renderSourceBadge(l.source)}</td>
