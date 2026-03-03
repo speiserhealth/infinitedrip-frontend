@@ -92,6 +92,7 @@ export default function Sidebar() {
       : []),
     { href: "/pipeline", label: "Funnel" },
     { href: "/stats", label: "Stats" },
+    { href: "/sandbox-chat", label: "Sandbox Chat" },
     { href: "/settings", label: "Settings" },
     ...(isAdmin
       ? [
