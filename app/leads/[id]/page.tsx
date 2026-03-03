@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiFetch";
 
 type LeadStatus = "engaged" | "cold" | "booked" | "missed_appointment" | "sold" | "dead";
@@ -35,6 +35,15 @@ type Lead = {
   dnc?: number | null;
   lead_snapshot_json?: string | null;
   lead_snapshot_updated_at?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+  created?: string | null;
+  lastMessageAt?: string | null;
+  last_message_at?: string | null;
+  lastMessageDirection?: "in" | "out" | null;
+  inboundCount?: number | null;
+  inbound_count?: number | null;
+  inbound?: number | null;
 };
 
 type Msg = {
@@ -305,6 +314,45 @@ function normalizeStatus(s: any): LeadStatus {
   return "engaged";
 }
 
+function toDateSafe(v?: string | null): number {
+  if (!v) return 0;
+  const iso = v.includes("T") ? v : v.replace(" ", "T") + "Z";
+  const d = new Date(iso);
+  const t = d.getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function normalizeLeadForNavigation(raw: any): Lead {
+  return {
+    ...raw,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null,
+    lastMessageAt: raw?.lastMessageAt ?? raw?.last_message_at ?? null,
+    inboundCount: Number(raw?.inboundCount ?? raw?.inbound_count ?? raw?.inbound ?? 0),
+  };
+}
+
+function compareLeadForNavigation(a: Lead, b: Lead) {
+  const waitingA = String(a?.lastMessageDirection || "").toLowerCase() === "in" ? 1 : 0;
+  const waitingB = String(b?.lastMessageDirection || "").toLowerCase() === "in" ? 1 : 0;
+  if (waitingA !== waitingB) return waitingB - waitingA;
+
+  const hotA = Number(a?.hot ?? 0) === 1 ? 1 : 0;
+  const hotB = Number(b?.hot ?? 0) === 1 ? 1 : 0;
+  if (hotA !== hotB) return hotB - hotA;
+
+  const statusA = normalizeStatus(a?.status);
+  const statusB = normalizeStatus(b?.status);
+  const ageA = Date.now() - toDateSafe(String(a?.createdAt || a?.created_at || a?.created || ""));
+  const ageB = Date.now() - toDateSafe(String(b?.createdAt || b?.created_at || b?.created || ""));
+  const coldA = statusA === "engaged" && ageA >= 3 * 24 * 60 * 60 * 1000 ? 1 : 0;
+  const coldB = statusB === "engaged" && ageB >= 3 * 24 * 60 * 60 * 1000 ? 1 : 0;
+  if (coldA !== coldB) return coldA - coldB;
+
+  const tA = toDateSafe(String(a?.createdAt || a?.created_at || a?.created || ""));
+  const tB = toDateSafe(String(b?.createdAt || b?.created_at || b?.created || ""));
+  return tB - tA;
+}
+
 function normalizeOptionalBitToBool(value: any): boolean | null {
   if (value === null || value === undefined || String(value).trim() === "") return null;
   const v = String(value).trim().toLowerCase();
@@ -414,6 +462,7 @@ function isHumanAttentionPauseReason(reasonRaw?: string | null) {
 
 export default function LeadThreadPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const idParam = params?.id;
   const leadId = Array.isArray(idParam) ? idParam[0] : idParam;
 
@@ -425,6 +474,7 @@ export default function LeadThreadPage() {
   const [messages, setMessages] = React.useState<Msg[]>([]);
   const [error, setError] = React.useState("");
   const [nowMs, setNowMs] = React.useState<number>(() => Date.now());
+  const [computedNextLeadId, setComputedNextLeadId] = React.useState<number | null>(null);
 
   const [newMessage, setNewMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -480,6 +530,13 @@ export default function LeadThreadPage() {
   const threadLoadInFlightRef = React.useRef(false);
   const viewedPostedLeadRef = React.useRef("");
 
+  const queryNextLeadId = React.useMemo(() => {
+    const n = Number(searchParams?.get("next") || 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [searchParams]);
+
+  const nextLeadId = queryNextLeadId ?? computedNextLeadId;
+
   React.useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
@@ -490,8 +547,18 @@ export default function LeadThreadPage() {
 
     const lr = await apiFetch(`${API_BASE}/api/leads?include_archived=1`, { cache: "no-store" });
     const ldata = await lr.json();
-    const list: Lead[] = Array.isArray(ldata) ? ldata : ldata?.leads ?? [];
+    const rawList: Lead[] = Array.isArray(ldata) ? ldata : ldata?.leads ?? [];
+    const list = rawList.map((x) => normalizeLeadForNavigation(x));
     const found = list.find((x) => String(x.id) === String(leadId)) || null;
+
+    const sortedForNavigation = [...list].sort(compareLeadForNavigation);
+    const navIdx = sortedForNavigation.findIndex((x) => String(x.id) === String(leadId));
+    if (navIdx >= 0 && navIdx < sortedForNavigation.length - 1) {
+      const nextId = Number(sortedForNavigation[navIdx + 1]?.id || 0);
+      setComputedNextLeadId(Number.isFinite(nextId) && nextId > 0 ? nextId : null);
+    } else {
+      setComputedNextLeadId(null);
+    }
 
     setLead(found);
     if (found) {
@@ -1270,14 +1337,29 @@ export default function LeadThreadPage() {
 
   return (
     <div className="mx-auto flex h-[88vh] w-full max-w-[1560px] flex-col rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-6">
-      <div className="mb-3 flex items-center gap-3">
-        <Link href="/leads" className="text-cyan-400 underline decoration-cyan-500/40">
-          ← Back
-        </Link>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Link href="/leads" className="text-cyan-400 underline decoration-cyan-500/40">
+            ← Back
+          </Link>
+          {nextLeadId ? (
+            <Link
+              href={`/leads/${nextLeadId}`}
+              className="rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-500/20"
+            >
+              Next Lead →
+            </Link>
+          ) : (
+            <span className="rounded border border-border/70 bg-card/60 px-2 py-1 text-xs text-muted-foreground">
+              Next Lead →
+            </span>
+          )}
+        </div>
 
-        <div className="text-sm text-muted-foreground">Lead #{leadId}</div>
-
-        {error && <div className="text-sm text-rose-400">{error}</div>}
+        <div className="flex items-center gap-3">
+          {error && <div className="text-sm text-rose-400">{error}</div>}
+          <div className="text-sm text-muted-foreground">Lead #{leadId}</div>
+        </div>
       </div>
 
       <div className="mb-3 flex items-start justify-between gap-3">

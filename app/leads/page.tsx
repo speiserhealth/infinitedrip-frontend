@@ -697,6 +697,13 @@ export default function LeadsPage() {
             </thead>
             <tbody>
               {sortedLeads.map((l) => {
+                const idx = sortedLeads.findIndex((x) => Number(x.id) === Number(l.id));
+                const prevLeadId = idx > 0 ? Number(sortedLeads[idx - 1]?.id || 0) : 0;
+                const nextLeadId = idx >= 0 && idx < sortedLeads.length - 1 ? Number(sortedLeads[idx + 1]?.id || 0) : 0;
+                const detailHref = `/leads/${l.id}`
+                  + `?from=leads`
+                  + (prevLeadId > 0 ? `&prev=${prevLeadId}` : "")
+                  + (nextLeadId > 0 ? `&next=${nextLeadId}` : "");
                 const st = normalizeStatus(l.status);
                 const cls = STATUS_STYLE[st];
                 const aiSignal = getAiSignal(l, nowMs);
@@ -710,7 +717,7 @@ export default function LeadsPage() {
                   <tr key={l.id} className="border-t border-border/70 hover:bg-muted/30">
                     <td className="px-3 py-1.5">
                       <div className="flex flex-col">
-                        <Link className="leading-tight text-cyan-400 underline decoration-cyan-500/40" href={`/leads/${l.id}`}>
+                        <Link className="leading-tight text-cyan-400 underline decoration-cyan-500/40" href={detailHref}>
                           {l.name || l.phone || `Lead #${l.id}`}
                         </Link>
                         <div className="text-[11px] text-muted-foreground">{l.phone}</div>
