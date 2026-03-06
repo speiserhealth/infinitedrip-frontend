@@ -16,6 +16,8 @@ type SettingsResponse = {
     ai_first_reply_mode?: string;
     ai_name?: string;
     ai_allow_quote?: boolean;
+    ai_quote_ask_plan_type_prompt?: boolean;
+    ai_quote_attempt_set_appointment_in_quote?: boolean;
     ai_quote_deviation_single?: number;
     ai_quote_deviation_couple?: number;
     ai_quote_deviation_per_dependent?: number;
@@ -48,6 +50,8 @@ type FormState = {
   ai_first_reply_mode: "require_prior_outbound" | "allow_first_reply";
   ai_name: string;
   ai_allow_quote: boolean;
+  ai_quote_ask_plan_type_prompt: boolean;
+  ai_quote_attempt_set_appointment_in_quote: boolean;
   ai_quote_deviation_single: string;
   ai_quote_deviation_couple: string;
   ai_quote_deviation_per_dependent: string;
@@ -149,6 +153,8 @@ const INITIAL_FORM: FormState = {
   ai_first_reply_mode: "require_prior_outbound",
   ai_name: "",
   ai_allow_quote: false,
+  ai_quote_ask_plan_type_prompt: true,
+  ai_quote_attempt_set_appointment_in_quote: false,
   ai_quote_deviation_single: "100",
   ai_quote_deviation_couple: "150",
   ai_quote_deviation_per_dependent: "25",
@@ -314,6 +320,12 @@ export default function SettingsPage() {
             : "require_prior_outbound",
         ai_name: String(s.ai_name || ""),
         ai_allow_quote: !!s.ai_allow_quote,
+        ai_quote_ask_plan_type_prompt:
+          typeof s.ai_quote_ask_plan_type_prompt === "boolean" ? s.ai_quote_ask_plan_type_prompt : true,
+        ai_quote_attempt_set_appointment_in_quote:
+          typeof s.ai_quote_attempt_set_appointment_in_quote === "boolean"
+            ? s.ai_quote_attempt_set_appointment_in_quote
+            : false,
         ai_quote_deviation_single: normalizeQuoteDeviation(s.ai_quote_deviation_single, 100, 5000),
         ai_quote_deviation_couple: normalizeQuoteDeviation(s.ai_quote_deviation_couple, 150, 5000),
         ai_quote_deviation_per_dependent: normalizeQuoteDeviation(s.ai_quote_deviation_per_dependent, 25, 1000),
@@ -774,6 +786,8 @@ export default function SettingsPage() {
           message: text,
           thread: payloadThread,
           allow_quote: !!form.ai_allow_quote,
+          quote_ask_plan_type_prompt: !!form.ai_quote_ask_plan_type_prompt,
+          quote_attempt_set_appointment_in_quote: !!form.ai_quote_attempt_set_appointment_in_quote,
           quote_deviation_single: Number(form.ai_quote_deviation_single || "100"),
           quote_deviation_couple: Number(form.ai_quote_deviation_couple || "150"),
           quote_deviation_per_dependent: Number(form.ai_quote_deviation_per_dependent || "25"),
@@ -805,6 +819,8 @@ export default function SettingsPage() {
       ai_first_reply_mode: form.ai_first_reply_mode,
       ai_name: String(form.ai_name || "").trim(),
       ai_allow_quote: !!form.ai_allow_quote,
+      ai_quote_ask_plan_type_prompt: !!form.ai_quote_ask_plan_type_prompt,
+      ai_quote_attempt_set_appointment_in_quote: !!form.ai_quote_attempt_set_appointment_in_quote,
       ai_quote_deviation_single: Number(normalizeQuoteDeviation(form.ai_quote_deviation_single, 100, 5000)),
       ai_quote_deviation_couple: Number(normalizeQuoteDeviation(form.ai_quote_deviation_couple, 150, 5000)),
       ai_quote_deviation_per_dependent: Number(normalizeQuoteDeviation(form.ai_quote_deviation_per_dependent, 25, 1000)),
@@ -1261,6 +1277,12 @@ export default function SettingsPage() {
             </p>
             <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
               <div>Quote mode: {form.ai_allow_quote ? "Enabled" : "Disabled"}</div>
+              <div>
+                Ask individual/family first: {form.ai_quote_ask_plan_type_prompt ? "Enabled" : "Disabled"}
+              </div>
+              <div>
+                Attempt appointment in quote: {form.ai_quote_attempt_set_appointment_in_quote ? "Enabled" : "Disabled"}
+              </div>
               <div>
                 Appointment time mode: {form.ai_schedule_time_mode === "accept_client_time" ? "Accept client time" : "Offer two alternatives"}
               </div>
@@ -1776,6 +1798,47 @@ export default function SettingsPage() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded border border-border/70 bg-muted/30 p-3 md:col-span-2">
+                  <span className="mb-1 block text-foreground font-medium">Ask Individual/Family First</span>
+                  <p className="text-xs text-muted-foreground">
+                    If disabled, AI skips plan-type question and goes directly to ages/genders in quote mode.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onField("ai_quote_ask_plan_type_prompt", !form.ai_quote_ask_plan_type_prompt)}
+                    className={`mt-2 rounded px-3 py-2 text-xs ${
+                      form.ai_quote_ask_plan_type_prompt
+                        ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                        : "border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
+                    }`}
+                  >
+                    {form.ai_quote_ask_plan_type_prompt ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+
+                <div className="rounded border border-border/70 bg-muted/30 p-3 md:col-span-2">
+                  <span className="mb-1 block text-foreground font-medium">Attempt Appointment In Quote</span>
+                  <p className="text-xs text-muted-foreground">
+                    If enabled, quote replies include the appointment ask instead of only quote-range acceptance prompt.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onField(
+                        "ai_quote_attempt_set_appointment_in_quote",
+                        !form.ai_quote_attempt_set_appointment_in_quote
+                      )
+                    }
+                    className={`mt-2 rounded px-3 py-2 text-xs ${
+                      form.ai_quote_attempt_set_appointment_in_quote
+                        ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                        : "border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
+                    }`}
+                  >
+                    {form.ai_quote_attempt_set_appointment_in_quote ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+
                 <label className="block text-sm">
                   <span className="mb-1 block text-muted-foreground">Individual Deviation (+/-)</span>
                   <input

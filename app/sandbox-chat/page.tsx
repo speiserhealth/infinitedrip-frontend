@@ -10,8 +10,20 @@ type ChatMsg = {
 };
 
 type SettingsResponse = {
+  settings?: {
+    ai_allow_quote?: boolean;
+    ai_allow_aca?: boolean;
+    ai_quote_ask_plan_type_prompt?: boolean;
+    ai_quote_attempt_set_appointment_in_quote?: boolean;
+    ai_quote_deviation_single?: number;
+    ai_quote_deviation_couple?: number;
+    ai_quote_deviation_per_dependent?: number;
+    ai_schedule_time_mode?: "offer_two_times" | "accept_client_time";
+  };
   ai_allow_quote?: boolean;
   ai_allow_aca?: boolean;
+  ai_quote_ask_plan_type_prompt?: boolean;
+  ai_quote_attempt_set_appointment_in_quote?: boolean;
   ai_quote_deviation_single?: number;
   ai_quote_deviation_couple?: number;
   ai_quote_deviation_per_dependent?: number;
@@ -40,6 +52,8 @@ export default function SandboxChatPage() {
   const [input, setInput] = React.useState("");
   const [allowQuote, setAllowQuote] = React.useState(true);
   const [allowAca, setAllowAca] = React.useState(true);
+  const [quoteAskPlanTypePrompt, setQuoteAskPlanTypePrompt] = React.useState(true);
+  const [quoteAttemptSetAppointmentInQuote, setQuoteAttemptSetAppointmentInQuote] = React.useState(false);
   const [scheduleTimeMode, setScheduleTimeMode] = React.useState<"offer_two_times" | "accept_client_time">(
     "offer_two_times"
   );
@@ -65,20 +79,33 @@ export default function SandboxChatPage() {
         if (!res.ok) throw new Error("Failed to load settings");
         const body = (await res.json().catch(() => ({}))) as SettingsResponse;
         if (dead) return;
-        setAllowQuote(Boolean(body?.ai_allow_quote));
+        const effective = (body?.settings && typeof body.settings === "object")
+          ? body.settings
+          : body;
+        setAllowQuote(Boolean(effective?.ai_allow_quote));
         setAllowAca(
-          typeof body?.ai_allow_aca === "boolean"
-            ? Boolean(body.ai_allow_aca)
+          typeof effective?.ai_allow_aca === "boolean"
+            ? Boolean(effective.ai_allow_aca)
             : true
         );
+        setQuoteAskPlanTypePrompt(
+          typeof effective?.ai_quote_ask_plan_type_prompt === "boolean"
+            ? Boolean(effective.ai_quote_ask_plan_type_prompt)
+            : true
+        );
+        setQuoteAttemptSetAppointmentInQuote(
+          typeof effective?.ai_quote_attempt_set_appointment_in_quote === "boolean"
+            ? Boolean(effective.ai_quote_attempt_set_appointment_in_quote)
+            : false
+        );
         setScheduleTimeMode(
-          body?.ai_schedule_time_mode === "accept_client_time"
+          effective?.ai_schedule_time_mode === "accept_client_time"
             ? "accept_client_time"
             : "offer_two_times"
         );
-        setQuoteDeviationSingle(clampInt(body?.ai_quote_deviation_single, 100, 0, 5000));
-        setQuoteDeviationCouple(clampInt(body?.ai_quote_deviation_couple, 150, 0, 5000));
-        setQuoteDeviationPerDependent(clampInt(body?.ai_quote_deviation_per_dependent, 25, 0, 1000));
+        setQuoteDeviationSingle(clampInt(effective?.ai_quote_deviation_single, 100, 0, 5000));
+        setQuoteDeviationCouple(clampInt(effective?.ai_quote_deviation_couple, 150, 0, 5000));
+        setQuoteDeviationPerDependent(clampInt(effective?.ai_quote_deviation_per_dependent, 25, 0, 1000));
       } catch (e: unknown) {
         if (!dead) setError(errorMessage(e, "Failed to load sandbox settings"));
       } finally {
@@ -115,6 +142,8 @@ export default function SandboxChatPage() {
           thread: payloadThread,
           allow_quote: allowQuote,
           allow_aca: allowAca,
+          quote_ask_plan_type_prompt: quoteAskPlanTypePrompt,
+          quote_attempt_set_appointment_in_quote: quoteAttemptSetAppointmentInQuote,
           quote_deviation_single: quoteDeviationSingle,
           quote_deviation_couple: quoteDeviationCouple,
           quote_deviation_per_dependent: quoteDeviationPerDependent,
@@ -188,6 +217,36 @@ export default function SandboxChatPage() {
               }`}
             >
               {allowAca ? "Enabled" : "Disabled"}
+            </button>
+          </label>
+
+          <label className="flex items-center justify-between rounded border border-cyan-500/25 px-3 py-2">
+            <span className="text-sm text-cyan-100">Ask Individual/Family First</span>
+            <button
+              type="button"
+              onClick={() => setQuoteAskPlanTypePrompt((v) => !v)}
+              className={`rounded px-2 py-1 text-xs font-semibold ${
+                quoteAskPlanTypePrompt
+                  ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
+                  : "border border-red-400/40 bg-red-500/20 text-red-200"
+              }`}
+            >
+              {quoteAskPlanTypePrompt ? "Enabled" : "Disabled"}
+            </button>
+          </label>
+
+          <label className="flex items-center justify-between rounded border border-cyan-500/25 px-3 py-2">
+            <span className="text-sm text-cyan-100">Attempt Appointment In Quote</span>
+            <button
+              type="button"
+              onClick={() => setQuoteAttemptSetAppointmentInQuote((v) => !v)}
+              className={`rounded px-2 py-1 text-xs font-semibold ${
+                quoteAttemptSetAppointmentInQuote
+                  ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
+                  : "border border-red-400/40 bg-red-500/20 text-red-200"
+              }`}
+            >
+              {quoteAttemptSetAppointmentInQuote ? "Enabled" : "Disabled"}
             </button>
           </label>
 
