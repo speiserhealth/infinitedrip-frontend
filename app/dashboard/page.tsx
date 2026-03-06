@@ -71,7 +71,7 @@ export default function DashboardPage() {
       <section className="mt-6 overflow-hidden rounded-xl border border-cyan-300/30 bg-slate-900/70 shadow-[0_0_36px_rgba(56,189,248,0.16)]">
         <div className="grid items-center gap-2 md:grid-cols-[1.25fr_1fr]">
           <div className="p-4 md:p-6">
-            <div className="text-xl font-semibold tracking-wide text-cyan-300 md:text-2xl">INFINITE DRIP</div>
+            <div className="text-xl font-semibold tracking-wide text-cyan-300 md:text-2xl">INFINITE D</div>
             <p className="mt-2 text-sm text-cyan-100/85">
               AI SMS appointment setting with lead tracking, booking, and follow-up in one view.
             </p>

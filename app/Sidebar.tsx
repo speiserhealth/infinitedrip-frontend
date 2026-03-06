@@ -126,7 +126,7 @@ export default function Sidebar() {
     <aside className="relative z-10 flex w-64 flex-col border-r border-sky-300/25 bg-slate-900/85 p-4 text-slate-100 shadow-[0_0_30px_rgba(56,189,248,0.10)] backdrop-blur-md">
       <div className="mb-6">
         <div className="text-3xl font-extrabold tracking-[0.12em] text-cyan-300 drop-shadow-[0_0_24px_rgba(56,189,248,0.72)]">
-          INFINITE DRIP
+          INFINITE D
         </div>
       </div>
 
