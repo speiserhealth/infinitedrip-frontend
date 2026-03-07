@@ -50,6 +50,18 @@ type SettingsForm = {
   gmail_lead_import_auto_text_template: string;
 };
 
+type ImportSample = {
+  status?: string;
+  reason?: string;
+};
+
+type ImportResultSummary = {
+  scanned: number;
+  imported: number;
+  ignored: number;
+  reasonCounts: Array<{ reason: string; count: number }>;
+};
+
 type QueryBuilderState = {
   lookbackDays: string;
   senderHintsText: string;
@@ -303,6 +315,7 @@ export default function EmailLeadsPage() {
   const [queryBuilder, setQueryBuilder] = React.useState<QueryBuilderState>(DEFAULT_QUERY_BUILDER);
   const [status, setStatus] = React.useState<GmailLeadImportStatus | null>(null);
   const [leads, setLeads] = React.useState<Lead[]>([]);
+  const [importSummary, setImportSummary] = React.useState<ImportResultSummary | null>(null);
 
   const load = React.useCallback(async () => {
     setError("");
@@ -431,6 +444,7 @@ export default function EmailLeadsPage() {
     setRunningImport(true);
     setError("");
     setSuccess("");
+    setImportSummary(null);
     try {
       const r = await apiFetch("/api/integrations/gmail-leads/import", {
         method: "POST",
@@ -443,6 +457,23 @@ export default function EmailLeadsPage() {
       }
       const body = await r.json().catch(() => ({}));
       const result = body?.result || {};
+      const samples = Array.isArray(result?.samples) ? (result.samples as ImportSample[]) : [];
+      const ignoredReasonMap = new Map<string, number>();
+      for (const sample of samples) {
+        const status = String(sample?.status || "").trim().toLowerCase();
+        if (status !== "ignored") continue;
+        const reason = String(sample?.reason || "unknown").trim().toLowerCase() || "unknown";
+        ignoredReasonMap.set(reason, (ignoredReasonMap.get(reason) || 0) + 1);
+      }
+      const reasonCounts = Array.from(ignoredReasonMap.entries())
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count);
+      setImportSummary({
+        scanned: Number(result?.scanned || 0),
+        imported: Number(result?.imported || 0),
+        ignored: Number(result?.skipped_nonlead || 0),
+        reasonCounts,
+      });
       setSuccess(
         `Import complete. Scanned ${Number(result?.scanned || 0)}, imported ${Number(result?.imported || 0)}, ignored ${Number(result?.skipped_nonlead || 0)}.`
       );
@@ -483,6 +514,21 @@ export default function EmailLeadsPage() {
           </div>
           {error ? <div className="mt-2 text-sm text-rose-400">{error}</div> : null}
           {success ? <div className="mt-2 text-sm text-emerald-300">{success}</div> : null}
+          {importSummary && importSummary.ignored > 0 ? (
+            <div className="mt-2 rounded border border-amber-400/35 bg-amber-500/10 p-2 text-xs text-amber-200">
+              <div className="font-medium">Ignored reason breakdown</div>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {(importSummary.reasonCounts.length ? importSummary.reasonCounts : [{ reason: "unknown", count: importSummary.ignored }]).map((row) => (
+                  <span
+                    key={`${row.reason}-${row.count}`}
+                    className="rounded border border-amber-300/35 bg-amber-500/10 px-2 py-0.5"
+                  >
+                    {row.reason}: {row.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
