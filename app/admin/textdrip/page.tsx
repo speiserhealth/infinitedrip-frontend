@@ -153,7 +153,6 @@ export default function AdminTextdripPage() {
 
   React.useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function setContactActive(contact: SuppressedContact, nextActive: boolean) {
