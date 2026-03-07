@@ -267,17 +267,6 @@ function getAiSignal(lead: Lead, nowMs = Date.now()): AiSignal {
   };
 }
 
-function isHumanAttentionPauseReason(reasonRaw?: string | null) {
-  const reason = String(reasonRaw || "").trim().toLowerCase();
-  if (!reason) return false;
-  if (reason.includes("handoff")) return true;
-  return [
-    "state_machine_loop_guard",
-    "pre_send_loop_guard",
-    "aca_disabled_negative_quote",
-  ].includes(reason);
-}
-
 function normalizeLead(raw: any): Lead {
   const createdAt = raw?.createdAt ?? raw?.created_at ?? raw?.created ?? null;
   const lastMessageAt = raw?.lastMessageAt ?? raw?.last_message_at ?? null;
@@ -707,8 +696,7 @@ export default function LeadsPage() {
                 const st = normalizeStatus(l.status);
                 const cls = STATUS_STYLE[st];
                 const aiSignal = getAiSignal(l, nowMs);
-                const needsHumanAttention =
-                  Number(l?.ai_paused ?? 0) === 1 && isHumanAttentionPauseReason(l?.ai_pause_reason);
+                const needsHumanAttention = Number(l?.ai_paused ?? 0) === 1;
 
                 const waiting = l.lastMessageDirection === "in";
                 const hot = Number(l.inboundCount ?? 0) >= 3;
@@ -717,9 +705,17 @@ export default function LeadsPage() {
                   <tr key={l.id} className="border-t border-border/70 hover:bg-muted/30">
                     <td className="px-3 py-1.5">
                       <div className="flex flex-col">
-                        <Link className="leading-tight text-cyan-400 underline decoration-cyan-500/40" href={detailHref}>
-                          {l.name || l.phone || `Lead #${l.id}`}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          {needsHumanAttention ? (
+                            <span
+                              title="Needs human intervention"
+                              className="inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.8)]"
+                            />
+                          ) : null}
+                          <Link className="leading-tight text-cyan-400 underline decoration-cyan-500/40" href={detailHref}>
+                            {l.name || l.phone || `Lead #${l.id}`}
+                          </Link>
+                        </div>
                         <div className="text-[11px] text-muted-foreground">{l.phone}</div>
                         {formatMessagePreview(l.last_message) ? (
                           <div className="mt-0.5 max-w-[260px] truncate text-[11px] text-muted-foreground">

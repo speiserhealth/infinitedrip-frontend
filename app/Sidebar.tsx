@@ -9,12 +9,15 @@ import { apiFetch } from "@/lib/apiFetch";
 type Activity = {
   leads_waiting: number;
   email_leads_waiting: number;
+  leads_human_alerts: number;
+  email_leads_human_alerts: number;
 };
 
 type NavItem = {
   href: string;
   label: string;
   badgeKey?: "leads" | "email_leads";
+  humanBadgeKey?: "leads" | "email_leads";
   indent?: boolean;
 };
 
@@ -33,6 +36,8 @@ export default function Sidebar() {
   const [activity, setActivity] = React.useState<Activity>({
     leads_waiting: 0,
     email_leads_waiting: 0,
+    leads_human_alerts: 0,
+    email_leads_human_alerts: 0,
   });
 
   React.useEffect(() => {
@@ -69,6 +74,8 @@ export default function Sidebar() {
             setActivity({
               leads_waiting: Math.max(0, toNumber(next?.leads_waiting)),
               email_leads_waiting: Math.max(0, toNumber(next?.email_leads_waiting)),
+              leads_human_alerts: Math.max(0, toNumber(next?.leads_human_alerts)),
+              email_leads_human_alerts: Math.max(0, toNumber(next?.email_leads_human_alerts)),
             });
           }
         }
@@ -86,9 +93,9 @@ export default function Sidebar() {
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/calendar", label: "Calendar" },
-    { href: "/leads", label: "Leads", badgeKey: "leads" },
+    { href: "/leads", label: "Leads", badgeKey: "leads", humanBadgeKey: "leads" },
     ...(emailLeadImportAccess
-      ? [{ href: "/email-leads", label: "Email Leads", badgeKey: "email_leads" as const, indent: true }]
+      ? [{ href: "/email-leads", label: "Email Leads", badgeKey: "email_leads" as const, humanBadgeKey: "email_leads" as const, indent: true }]
       : []),
     { href: "/pipeline", label: "Funnel" },
     { href: "/stats", label: "Stats" },
@@ -122,6 +129,12 @@ export default function Sidebar() {
     return 0;
   }
 
+  function humanBadgeCount(item: NavItem) {
+    if (item.humanBadgeKey === "leads") return activity.leads_human_alerts;
+    if (item.humanBadgeKey === "email_leads") return activity.email_leads_human_alerts;
+    return 0;
+  }
+
   return (
     <aside className="relative z-10 flex w-64 flex-col border-r border-sky-300/25 bg-slate-900/85 p-4 text-slate-100 shadow-[0_0_30px_rgba(56,189,248,0.10)] backdrop-blur-md">
       <div className="mb-6">
@@ -134,6 +147,7 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const active = isActive(item.href);
           const count = badgeCount(item);
+          const humanCount = humanBadgeCount(item);
           return (
             <Link
               key={item.href}
@@ -147,11 +161,21 @@ export default function Sidebar() {
               ].join(" ")}
             >
               <span>{item.label}</span>
+              <span className="ml-2 inline-flex items-center gap-1.5">
+                {humanCount > 0 ? (
+                  <span
+                    title="Needs human attention"
+                    className="inline-flex min-w-[20px] justify-center rounded-full border border-rose-300/60 bg-rose-500/25 px-1.5 py-0.5 text-[11px] font-semibold text-rose-100"
+                  >
+                    {humanCount > 99 ? "99+" : humanCount}
+                  </span>
+                ) : null}
               {count > 0 ? (
                 <span className="ml-2 inline-flex min-w-[20px] justify-center rounded-full border border-amber-300/50 bg-amber-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-amber-200">
                   {count > 99 ? "99+" : count}
                 </span>
               ) : null}
+              </span>
             </Link>
           );
         })}
