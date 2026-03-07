@@ -341,7 +341,7 @@ function formatWeekdaySummary(days: number[]): string {
 function formatRecurringRuleLabel(rule: RecurringBlockRule): string {
   const days = formatWeekdaySummary(rule.weekdays);
   if (rule.all_day) return `${days} (all day)`;
-  return `${days} ${rule.start_hm} - ${rule.end_hm}`;
+  return `${days} ${formatHm12(rule.start_hm)} - ${formatHm12(rule.end_hm)}`;
 }
 
 function buildCalendarBlockoutRangesPayload(
@@ -377,9 +377,21 @@ function formatBlockoutRangeLabel(range: BlockoutRange): string {
   if (!start || !end) return "Invalid range";
   const day = start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   if (range.all_day) return `${day} (all day)`;
-  const from = start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  const to = end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const from = start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
+  const to = end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
   return `${day} ${from} - ${to}`;
+}
+
+function formatHm12(hm: string): string {
+  const normalized = normalizeHm(hm);
+  if (!normalized) return "";
+  const [hStr, mStr] = normalized.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return normalized;
+  const suffix = h >= 12 ? "PM" : "AM";
+  const hr12 = ((h + 11) % 12) + 1;
+  return `${hr12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
 export default function CalendarPage() {
