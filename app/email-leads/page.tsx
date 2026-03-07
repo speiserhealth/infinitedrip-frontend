@@ -24,6 +24,8 @@ type Lead = {
   last_message_at?: string | null;
   inboundCount?: number | null;
   inbound_count?: number | null;
+  ai_paused?: number | null;
+  ai_pause_reason?: string | null;
   lead_snapshot_json?: string | null;
 };
 
@@ -37,6 +39,9 @@ type GmailLeadImportStatus = {
   source_hints?: { from?: string[]; subject?: string[] };
   auto_text_enabled?: boolean;
   auto_text_template_set?: boolean;
+  worker_enabled?: boolean;
+  worker_interval_ms?: number;
+  worker_per_user_limit?: number;
   warning?: string;
   detail?: string;
   recent_imports_24h?: number;
@@ -73,12 +78,19 @@ type QueryBuilderState = {
 const QUOTE_WIZARD_DEFAULT_SENDERS = [
   "quotewizard@leads.qwagents.com",
   "leads.qwagents.com",
+  "nextgen",
+  "mastodon",
+  "ushamarketplace",
+  "usha",
 ];
 
 const QUOTE_WIZARD_DEFAULT_SUBJECTS = [
   "qw health lead",
   "health lead",
   "custom lead type name",
+  "nextgen",
+  "mastodon",
+  "usha marketplace",
 ];
 
 const DEFAULT_FORM: SettingsForm = {
@@ -220,6 +232,37 @@ function classifyProviderBadge({
   const from = normalizeProviderToken(fromEmail);
   const subj = normalizeProviderToken(subject);
 
+  if (src === "quotewizard") {
+    return {
+      label: "QUOTE WIZARD",
+      className: "border-sky-400/40 bg-sky-500/15 text-sky-300",
+    };
+  }
+  if (src === "nextgen") {
+    return {
+      label: "NEXTGEN",
+      className: "border-blue-400/40 bg-blue-500/15 text-blue-300",
+    };
+  }
+  if (src === "mastodon") {
+    return {
+      label: "MASTODON",
+      className: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-300",
+    };
+  }
+  if (src === "ushamarketplace") {
+    return {
+      label: "USHAMARKETPLACE",
+      className: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+    };
+  }
+  if (src === "usha") {
+    return {
+      label: "USHA",
+      className: "border-teal-400/40 bg-teal-500/15 text-teal-300",
+    };
+  }
+
   if (src === "manual") {
     return {
       label: "MANUAL",
@@ -247,6 +290,30 @@ function classifyProviderBadge({
     return {
       label: "QUOTE WIZARD",
       className: "border-sky-400/40 bg-sky-500/15 text-sky-300",
+    };
+  }
+  if (from.includes("nextgen") || subj.includes("nextgen") || subj.includes("next gen")) {
+    return {
+      label: "NEXTGEN",
+      className: "border-blue-400/40 bg-blue-500/15 text-blue-300",
+    };
+  }
+  if (from.includes("mastodon") || subj.includes("mastodon")) {
+    return {
+      label: "MASTODON",
+      className: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-300",
+    };
+  }
+  if (from.includes("ushamarketplace") || subj.includes("usha marketplace")) {
+    return {
+      label: "USHAMARKETPLACE",
+      className: "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
+    };
+  }
+  if (from.includes("usha") || subj.includes("usha")) {
+    return {
+      label: "USHA",
+      className: "border-teal-400/40 bg-teal-500/15 text-teal-300",
     };
   }
   if (from.includes("lendingtree")) {
@@ -317,6 +384,10 @@ export default function EmailLeadsPage() {
   const [status, setStatus] = React.useState<GmailLeadImportStatus | null>(null);
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [importSummary, setImportSummary] = React.useState<ImportResultSummary | null>(null);
+  const [testTo, setTestTo] = React.useState("");
+  const [testMessage, setTestMessage] = React.useState("");
+  const [sendingTest, setSendingTest] = React.useState(false);
+  const [purging, setPurging] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setError("");
@@ -347,6 +418,11 @@ export default function EmailLeadsPage() {
           gmail_lead_import_auto_text_enabled: !!s?.gmail_lead_import_auto_text_enabled,
           gmail_lead_import_auto_text_template: String(s?.gmail_lead_import_auto_text_template || ""),
         });
+        setTestMessage((prev) =>
+          String(prev || "").trim()
+            ? prev
+            : String(s?.gmail_lead_import_auto_text_template || "")
+        );
         setQueryBuilder(parseGmailQueryToBuilder(String(s?.gmail_lead_import_query || "in:inbox newer_than:14d")));
       }
       if (statusResp.ok) {
@@ -450,7 +526,7 @@ export default function EmailLeadsPage() {
       const r = await apiFetch("/api/integrations/gmail-leads/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limit: 500, dry_run: false }),
+        body: JSON.stringify({ limit: 0, dry_run: false }),
       });
       if (!r.ok) {
         const details = await readResponseError(r);
@@ -477,13 +553,72 @@ export default function EmailLeadsPage() {
         reasonCounts,
       });
       setSuccess(
-        `Import complete. Scanned ${Number(result?.scanned || 0)}, imported ${Number(result?.imported || 0)}, ignored ${Number(result?.skipped_nonlead || 0)}, deduped ${Number(result?.deduped || 0)}.`
+        `Import complete. Scanned ${Number(result?.scanned || 0)}, imported ${Number(result?.imported || 0)}, ignored ${Number(result?.skipped_nonlead || 0)}, deduped ${Number(result?.deduped || 0)}${result?.truncated ? " (scan capped by server hard max)." : ""}.`
       );
       await Promise.all([checkStatus(), loadEmailLeads()]);
     } catch (e: any) {
       setError(String(e?.message || "Import failed"));
     } finally {
       setRunningImport(false);
+    }
+  }
+
+  async function sendTestTextNow() {
+    if (!hasAccess) return;
+    setSendingTest(true);
+    setError("");
+    setSuccess("");
+    try {
+      const to = String(testTo || "").trim();
+      const message = String(testMessage || "").trim();
+      if (!to) throw new Error("Test phone is required.");
+      if (!message) throw new Error("Test message is required.");
+      const r = await apiFetch("/api/integrations/gmail-leads/test-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, message }),
+      });
+      if (!r.ok) {
+        const details = await readResponseError(r);
+        throw new Error(`Test send failed (${r.status}): ${details}`);
+      }
+      const body = await r.json().catch(() => ({}));
+      setSuccess(
+        `Test text queued to ${to}. Lead #${Number(body?.lead_id || 0)}.`
+      );
+      await loadEmailLeads();
+    } catch (e: any) {
+      setError(String(e?.message || "Test send failed"));
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function purgeImportedLeads() {
+    if (!hasAccess) return;
+    if (!window.confirm("Delete all imported email leads for this account? This cannot be undone.")) return;
+    setPurging(true);
+    setError("");
+    setSuccess("");
+    try {
+      const r = await apiFetch("/api/integrations/gmail-leads/purge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dry_run: false }),
+      });
+      if (!r.ok) {
+        const details = await readResponseError(r);
+        throw new Error(`Purge failed (${r.status}): ${details}`);
+      }
+      const body = await r.json().catch(() => ({}));
+      setSuccess(
+        `Purged ${Number(body?.deleted_count || 0)} imported email lead${Number(body?.deleted_count || 0) === 1 ? "" : "s"}.`
+      );
+      await Promise.all([checkStatus(), loadEmailLeads()]);
+    } catch (e: any) {
+      setError(String(e?.message || "Purge failed"));
+    } finally {
+      setPurging(false);
     }
   }
 
@@ -506,13 +641,26 @@ export default function EmailLeadsPage() {
     );
   }
 
+  const humanAlertCount = leads.reduce(
+    (count, lead) => count + (Number(lead?.ai_paused || 0) === 1 ? 1 : 0),
+    0
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1680px] rounded-2xl border border-border/70 bg-card/40 p-4 shadow-xl backdrop-blur-sm md:p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Email Leads</h1>
+          {humanAlertCount > 0 ? (
+            <div className="mt-1 inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/15 px-2 py-0.5 text-[11px] text-rose-200">
+              {humanAlertCount > 99 ? "99+" : humanAlertCount} need human attention
+            </div>
+          ) : null}
           <div className="mt-1 text-xs text-muted-foreground">
             Gmail inbox import for structured lead-source emails.
+          </div>
+          <div className="mt-1 text-[11px] text-cyan-200/90">
+            Full import scans all matching messages (first run may take a while). Ongoing auto-scan uses smaller batches.
           </div>
           {error ? <div className="mt-2 text-sm text-rose-400">{error}</div> : null}
           {success ? <div className="mt-2 text-sm text-emerald-300">{success}</div> : null}
@@ -547,7 +695,15 @@ export default function EmailLeadsPage() {
             disabled={runningImport || !form.gmail_lead_import_enabled}
             className="rounded bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-60"
           >
-            {runningImport ? "Importing..." : "Run Import Now"}
+            {runningImport ? "Importing..." : "Run Full Import"}
+          </button>
+          <button
+            type="button"
+            onClick={() => purgeImportedLeads().catch(() => {})}
+            disabled={purging}
+            className="rounded border border-rose-400/40 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
+          >
+            {purging ? "Purging..." : "Purge Imported"}
           </button>
           <button
             type="button"
@@ -610,7 +766,7 @@ export default function EmailLeadsPage() {
               <div className="rounded border border-border/70 bg-muted/30 p-2">
                 <div className="grid grid-cols-1 gap-2">
                   <div className="rounded border border-cyan-400/25 bg-cyan-500/10 p-2 text-[11px] text-cyan-100">
-                    Defaults are preloaded for QuoteWizard-style emails. Update these only if your lead source uses different sender addresses or subject wording.
+                    Defaults are preloaded for QuoteWizard, NextGen, Mastodon, USHAMarketplace, and USHA patterns. Update these only if your lead source uses different sender addresses or subject wording.
                   </div>
                   <label className="text-xs">
                     <span className="mb-1 block text-muted-foreground">Look back this many days</span>
@@ -661,7 +817,7 @@ export default function EmailLeadsPage() {
                         }
                       }}
                       className="w-full rounded border border-border bg-background/40 px-2.5 py-1.5 text-sm text-foreground"
-                      placeholder={"example:\nquotewizard@leads.qwagents.com\nleads.qwagents.com"}
+                      placeholder={"example:\nquotewizard@leads.qwagents.com\nnextgen\nushamarketplace"}
                     />
                   </label>
                   <label className="text-xs">
@@ -677,7 +833,7 @@ export default function EmailLeadsPage() {
                         }
                       }}
                       className="w-full rounded border border-border bg-background/40 px-2.5 py-1.5 text-sm text-foreground"
-                      placeholder={"example:\nQW HEALTH Lead\nCustom Lead Type Name"}
+                      placeholder={"example:\nQW HEALTH Lead\nNEXTGEN\nUSHA Marketplace"}
                     />
                   </label>
                   <div className="rounded border border-border/70 bg-card/70 p-2 text-[11px] text-muted-foreground">
@@ -730,6 +886,36 @@ export default function EmailLeadsPage() {
                 placeholder="Hi, following up on your request. Can I send you a quote?"
               />
             </label>
+            <div className="rounded border border-border/70 bg-muted/35 p-2">
+              <div className="mb-1 text-sm text-foreground">Send Test Text</div>
+              <div className="mb-2 text-[11px] text-muted-foreground">
+                Sends via the same outbound Textdrip path used by lead messaging and auto-text.
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input
+                  type="text"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                  className="w-full rounded border border-border bg-background/40 px-2.5 py-1.5 text-sm text-foreground"
+                  placeholder="+15551234567"
+                />
+                <button
+                  type="button"
+                  onClick={() => sendTestTextNow().catch(() => {})}
+                  disabled={sendingTest}
+                  className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/25 disabled:opacity-60"
+                >
+                  {sendingTest ? "Sending..." : "Send Test Text"}
+                </button>
+              </div>
+              <textarea
+                rows={2}
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                className="mt-2 w-full rounded border border-border bg-background/40 px-2.5 py-1.5 text-sm text-foreground"
+                placeholder="Test message"
+              />
+            </div>
           </div>
         </div>
 
@@ -741,6 +927,11 @@ export default function EmailLeadsPage() {
             <div>Mailbox: {status?.account_email ? status.account_email : "-"}</div>
             <div>Configured: {status?.configured ? "Yes" : "No"}</div>
             <div>Import enabled: {status?.enabled ? "Yes" : "No"}</div>
+            <div>Auto-scan worker: {status?.worker_enabled ? "On" : "Off"}</div>
+            <div>
+              Auto-scan interval: {Number(status?.worker_interval_ms || 0) > 0 ? `${Math.round(Number(status?.worker_interval_ms || 0) / 1000)}s` : "-"}
+            </div>
+            <div>Auto-scan batch cap: {Number(status?.worker_per_user_limit || 0) || "-"}</div>
             <div>Auto-text template: {status?.auto_text_template_set ? "Set" : "Not set"}</div>
             <div>Imports (24h): {Number(status?.recent_imports_24h || 0)}</div>
             {status?.source_hints?.from?.length ? (
@@ -766,7 +957,7 @@ export default function EmailLeadsPage() {
               <tr>
                 <th className="px-3 py-1.5 text-left">Lead</th>
                 <th className="px-3 py-1.5 text-left">Email</th>
-                <th className="px-3 py-1.5 text-left">From</th>
+                <th className="px-3 py-1.5 text-left">Source</th>
                 <th className="px-3 py-1.5 text-left">Subject</th>
                 <th className="px-3 py-1.5 text-left">Conversation Preview</th>
                 <th className="px-3 py-1.5 text-left">Created</th>
@@ -785,23 +976,42 @@ export default function EmailLeadsPage() {
                   fromEmail,
                   subject,
                 });
+                const needsHuman = Number(lead.ai_paused || 0) === 1;
                 const location = [lead.city, lead.state, lead.zip].filter(Boolean).join(", ");
                 return (
                   <tr key={lead.id} className="border-t border-border/70 hover:bg-muted/30">
                     <td className="px-3 py-1.5">
                       <div className="flex flex-col">
-                        <Link href={`/leads/${lead.id}`} className="text-cyan-400 underline decoration-cyan-500/40">
-                          {lead.name || lead.phone || `Lead #${lead.id}`}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          {needsHuman ? (
+                            <span
+                              title="Needs human intervention"
+                              className="inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.8)]"
+                            />
+                          ) : null}
+                          <Link href={`/leads/${lead.id}`} className="text-cyan-400 underline decoration-cyan-500/40">
+                            {lead.name || lead.phone || `Lead #${lead.id}`}
+                          </Link>
+                        </div>
                         <div className="text-[11px] text-muted-foreground">{lead.phone || "-"}</div>
+                        {needsHuman ? (
+                          <div className="text-[11px] text-rose-300">
+                            Human attention: {String(lead.ai_pause_reason || "ai_paused")}
+                          </div>
+                        ) : null}
                         {location ? <div className="text-[11px] text-muted-foreground">{location}</div> : null}
                       </div>
                     </td>
                     <td className="px-3 py-1.5 text-muted-foreground">{lead.email || "-"}</td>
                     <td className="px-3 py-1.5">
-                      <span className={`inline-flex items-center rounded border px-2 py-1 text-[11px] font-medium ${provider.className}`}>
-                        {provider.label}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex w-fit items-center rounded border px-2 py-1 text-[11px] font-medium ${provider.className}`}>
+                          {provider.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatPreview(fromEmail, 42) || "-"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 py-1.5 text-muted-foreground">{formatPreview(subject, 48) || "-"}</td>
                     <td className="max-w-[420px] px-3 py-1.5 text-foreground">

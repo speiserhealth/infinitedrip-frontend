@@ -211,6 +211,48 @@ function renderSourceBadge(v?: string | null) {
       </span>
     );
   }
+  if (s === "quotewizard") {
+    return (
+      <span className="text-[11px] rounded border border-sky-400/40 bg-sky-500/15 px-2 py-1 text-sky-300">
+        QuoteWizard
+      </span>
+    );
+  }
+  if (s === "nextgen") {
+    return (
+      <span className="text-[11px] rounded border border-blue-400/40 bg-blue-500/15 px-2 py-1 text-blue-300">
+        NextGen
+      </span>
+    );
+  }
+  if (s === "mastodon") {
+    return (
+      <span className="text-[11px] rounded border border-fuchsia-400/40 bg-fuchsia-500/15 px-2 py-1 text-fuchsia-300">
+        Mastodon
+      </span>
+    );
+  }
+  if (s === "ushamarketplace") {
+    return (
+      <span className="text-[11px] rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-1 text-emerald-300">
+        USHAMarketplace
+      </span>
+    );
+  }
+  if (s === "usha") {
+    return (
+      <span className="text-[11px] rounded border border-teal-400/40 bg-teal-500/15 px-2 py-1 text-teal-300">
+        USHA
+      </span>
+    );
+  }
+  if (s === "gmail" || s === "gmail_test") {
+    return (
+      <span className="text-[11px] rounded border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-indigo-300">
+        Gmail
+      </span>
+    );
+  }
   if (s === "manual") {
     return (
       <span className="text-[11px] rounded border border-border/70 bg-muted/60 px-2 py-1 text-muted-foreground">
