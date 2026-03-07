@@ -18,26 +18,13 @@ export const metadata: Metadata = {
   description: "InfiniteDrip CRM",
 };
 
-const THEME_INIT_SCRIPT = `
-(() => {
-  try {
-    document.documentElement.classList.add("dark");
-    document.documentElement.setAttribute("data-theme", "dark");
-    localStorage.setItem("infinitedrip_theme", "dark");
-  } catch {}
-})();
-`;
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
+    <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={{ margin: 0 }}
