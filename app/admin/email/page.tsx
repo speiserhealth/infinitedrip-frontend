@@ -165,6 +165,7 @@ export default function AdminEmailPage() {
 
   React.useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function setSuppressedActive(row: SuppressedEmail, nextActive: boolean) {
