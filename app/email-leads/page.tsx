@@ -31,6 +31,7 @@ type GmailLeadImportStatus = {
   access_granted?: boolean;
   configured?: boolean;
   connected?: boolean;
+  account_email?: string;
   enabled?: boolean;
   query?: string;
   source_hints?: { from?: string[]; subject?: string[] };
@@ -689,6 +690,7 @@ export default function EmailLeadsPage() {
           <div className="space-y-1 text-xs text-muted-foreground">
             <div>Access: {status?.access_granted === false ? "Not granted" : "Granted"}</div>
             <div>Gmail: {status?.connected ? "Connected" : "Not connected"}</div>
+            <div>Mailbox: {status?.account_email ? status.account_email : "-"}</div>
             <div>Configured: {status?.configured ? "Yes" : "No"}</div>
             <div>Import enabled: {status?.enabled ? "Yes" : "No"}</div>
             <div>Auto-text template: {status?.auto_text_template_set ? "Set" : "Not set"}</div>
