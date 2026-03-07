@@ -59,6 +59,7 @@ type ImportResultSummary = {
   scanned: number;
   imported: number;
   ignored: number;
+  deduped: number;
   reasonCounts: Array<{ reason: string; count: number }>;
 };
 
@@ -449,7 +450,7 @@ export default function EmailLeadsPage() {
       const r = await apiFetch("/api/integrations/gmail-leads/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limit: 30, dry_run: false }),
+        body: JSON.stringify({ limit: 500, dry_run: false }),
       });
       if (!r.ok) {
         const details = await readResponseError(r);
@@ -472,10 +473,11 @@ export default function EmailLeadsPage() {
         scanned: Number(result?.scanned || 0),
         imported: Number(result?.imported || 0),
         ignored: Number(result?.skipped_nonlead || 0),
+        deduped: Number(result?.deduped || 0),
         reasonCounts,
       });
       setSuccess(
-        `Import complete. Scanned ${Number(result?.scanned || 0)}, imported ${Number(result?.imported || 0)}, ignored ${Number(result?.skipped_nonlead || 0)}.`
+        `Import complete. Scanned ${Number(result?.scanned || 0)}, imported ${Number(result?.imported || 0)}, ignored ${Number(result?.skipped_nonlead || 0)}, deduped ${Number(result?.deduped || 0)}.`
       );
       await Promise.all([checkStatus(), loadEmailLeads()]);
     } catch (e: any) {
