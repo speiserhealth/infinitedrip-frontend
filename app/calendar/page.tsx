@@ -37,6 +37,7 @@ type SettingsResponse = {
     calendar_blockout_start?: string;
     calendar_blockout_end?: string;
     calendar_blockout_ranges?: unknown;
+    calendar_blockout_recurring?: unknown;
   };
 };
 
@@ -56,10 +57,7 @@ type CalendarRulesSnapshot = {
   maxConcurrent: string;
   overlapWindow: string;
   blockoutEnabled: boolean;
-  blockoutWeekdays: number[];
-  blockoutAllDay: boolean;
-  blockoutStart: string;
-  blockoutEnd: string;
+  blockoutRecurring: RecurringBlockRule[];
   blockoutRanges: BlockoutRange[];
 };
 
@@ -67,6 +65,13 @@ type BlockoutRange = {
   start: string;
   end: string;
   all_day: boolean;
+};
+
+type RecurringBlockRule = {
+  weekdays: number[];
+  all_day: boolean;
+  start_hm: string;
+  end_hm: string;
 };
 
 function parseDateSafe(raw?: string | null): Date | null {
@@ -219,6 +224,57 @@ function normalizeWeekdayList(raw: unknown): number[] {
   return Array.from(out).sort((a, b) => a - b);
 }
 
+function normalizeHm(raw: unknown): string {
+  const s = String(raw || "").trim();
+  const m = s.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!m) return "";
+  return `${String(Number(m[1])).padStart(2, "0")}:${String(m[2]).padStart(2, "0")}`;
+}
+
+function normalizeRecurringBlockRules(raw: unknown): RecurringBlockRule[] {
+  const rows = Array.isArray(raw)
+    ? raw
+    : (() => {
+        const s = String(raw || "").trim();
+        if (!s) return [];
+        try {
+          const parsed = JSON.parse(s);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+  const dedupe = new Map<string, RecurringBlockRule>();
+  for (const row of rows) {
+    const kind = String((row as { kind?: unknown })?.kind || "").trim().toLowerCase();
+    if (kind && kind !== "weekly") continue;
+    const weekdays = normalizeWeekdayList((row as { weekdays?: unknown })?.weekdays);
+    if (!weekdays.length) continue;
+    const allDay =
+      String((row as { all_day?: unknown })?.all_day || "").trim() === "1" ||
+      String((row as { all_day?: unknown })?.all_day || "").trim().toLowerCase() === "true";
+    const startHm = normalizeHm((row as { start_hm?: unknown; start?: unknown })?.start_hm ?? (row as { start?: unknown })?.start);
+    const endHm = normalizeHm((row as { end_hm?: unknown; end?: unknown })?.end_hm ?? (row as { end?: unknown })?.end);
+    if (!allDay && (!startHm || !endHm || startHm >= endHm)) continue;
+    const normalized: RecurringBlockRule = {
+      weekdays,
+      all_day: !!allDay,
+      start_hm: allDay ? "" : startHm,
+      end_hm: allDay ? "" : endHm,
+    };
+    const key = `${normalized.weekdays.join(",")}|${normalized.all_day ? 1 : 0}|${normalized.start_hm}|${normalized.end_hm}`;
+    dedupe.set(key, normalized);
+  }
+  return Array.from(dedupe.values()).sort((a, b) => {
+    const dayCmp = a.weekdays.join(",").localeCompare(b.weekdays.join(","));
+    if (dayCmp !== 0) return dayCmp;
+    if (a.all_day !== b.all_day) return a.all_day ? -1 : 1;
+    const startCmp = a.start_hm.localeCompare(b.start_hm);
+    if (startCmp !== 0) return startCmp;
+    return a.end_hm.localeCompare(b.end_hm);
+  });
+}
+
 function normalizeBlockoutRanges(raw: unknown): BlockoutRange[] {
   const rows = Array.isArray(raw)
     ? raw
@@ -234,6 +290,8 @@ function normalizeBlockoutRanges(raw: unknown): BlockoutRange[] {
       })();
   const out: BlockoutRange[] = [];
   for (const row of rows) {
+    const kind = String((row as { kind?: unknown })?.kind || "").trim().toLowerCase();
+    if (kind === "weekly") continue;
     const start = String((row as { start?: string })?.start || "").trim();
     const end = String((row as { end?: string })?.end || "").trim();
     const startMs = Date.parse(start);
@@ -251,10 +309,16 @@ function normalizeBlockoutRanges(raw: unknown): BlockoutRange[] {
   return out.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
 }
 
-function sameWeekdaySet(a: number[], b: number[]): boolean {
+function sameRecurringBlockRules(a: RecurringBlockRule[], b: RecurringBlockRule[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
+    if (a[i].all_day !== b[i].all_day) return false;
+    if (a[i].start_hm !== b[i].start_hm) return false;
+    if (a[i].end_hm !== b[i].end_hm) return false;
+    if (a[i].weekdays.length !== b[i].weekdays.length) return false;
+    for (let j = 0; j < a[i].weekdays.length; j += 1) {
+      if (a[i].weekdays[j] !== b[i].weekdays[j]) return false;
+    }
   }
   return true;
 }
@@ -272,6 +336,31 @@ function sameBlockoutRanges(a: BlockoutRange[], b: BlockoutRange[]): boolean {
 function formatWeekdaySummary(days: number[]): string {
   if (!days.length) return "No weekdays selected.";
   return days.map((d) => FULL_WEEKDAY_LABELS[d] || "").filter(Boolean).join(", ");
+}
+
+function formatRecurringRuleLabel(rule: RecurringBlockRule): string {
+  const days = formatWeekdaySummary(rule.weekdays);
+  if (rule.all_day) return `${days} (all day)`;
+  return `${days} ${rule.start_hm} - ${rule.end_hm}`;
+}
+
+function buildCalendarBlockoutRangesPayload(
+  specificRanges: BlockoutRange[],
+  recurringRules: RecurringBlockRule[]
+): Array<Record<string, unknown>> {
+  const specificPayload = normalizeBlockoutRanges(specificRanges).map((range) => ({
+    start: range.start,
+    end: range.end,
+    all_day: !!range.all_day,
+  }));
+  const recurringPayload = normalizeRecurringBlockRules(recurringRules).map((rule) => ({
+    kind: "weekly",
+    weekdays: [...rule.weekdays].sort((a, b) => a - b),
+    all_day: !!rule.all_day,
+    start_hm: rule.all_day ? "" : rule.start_hm,
+    end_hm: rule.all_day ? "" : rule.end_hm,
+  }));
+  return [...specificPayload, ...recurringPayload];
 }
 
 function dateInputToday() {
@@ -311,6 +400,7 @@ export default function CalendarPage() {
   const [blockoutAllDay, setBlockoutAllDay] = React.useState(false);
   const [blockoutStart, setBlockoutStart] = React.useState("09:00");
   const [blockoutEnd, setBlockoutEnd] = React.useState("17:00");
+  const [blockoutRecurring, setBlockoutRecurring] = React.useState<RecurringBlockRule[]>([]);
   const [blockoutRanges, setBlockoutRanges] = React.useState<BlockoutRange[]>([]);
   const [blockoutOpen, setBlockoutOpen] = React.useState(false);
   const [newBlockDate, setNewBlockDate] = React.useState(dateInputToday());
@@ -328,20 +418,14 @@ export default function CalendarPage() {
       maxConcurrent,
       overlapWindow,
       blockoutEnabled,
-      blockoutWeekdays: [...blockoutWeekdays].sort((a, b) => a - b),
-      blockoutAllDay,
-      blockoutStart,
-      blockoutEnd,
+      blockoutRecurring: normalizeRecurringBlockRules(blockoutRecurring),
       blockoutRanges: [...blockoutRanges].sort((a, b) => Date.parse(a.start) - Date.parse(b.start)),
     }),
     [
       maxConcurrent,
       overlapWindow,
       blockoutEnabled,
-      blockoutWeekdays,
-      blockoutAllDay,
-      blockoutStart,
-      blockoutEnd,
+      blockoutRecurring,
       blockoutRanges,
     ]
   );
@@ -358,22 +442,18 @@ export default function CalendarPage() {
     if (!savedRules) return false;
     return (
       savedRules.blockoutEnabled !== currentRules.blockoutEnabled ||
-      savedRules.blockoutAllDay !== currentRules.blockoutAllDay ||
-      savedRules.blockoutStart !== currentRules.blockoutStart ||
-      savedRules.blockoutEnd !== currentRules.blockoutEnd ||
-      !sameWeekdaySet(savedRules.blockoutWeekdays, currentRules.blockoutWeekdays) ||
+      !sameRecurringBlockRules(savedRules.blockoutRecurring, currentRules.blockoutRecurring) ||
       !sameBlockoutRanges(savedRules.blockoutRanges, currentRules.blockoutRanges)
     );
   }, [savedRules, currentRules]);
 
-  const blockoutTimeInvalid =
-    blockoutEnabled &&
+  const recurringDraftInvalid =
     blockoutWeekdays.length > 0 &&
     !blockoutAllDay &&
     (!blockoutStart || !blockoutEnd || blockoutStart >= blockoutEnd);
   const blockoutMissingDays =
     blockoutEnabled &&
-    blockoutWeekdays.length === 0 &&
+    blockoutRecurring.length === 0 &&
     blockoutRanges.length === 0;
 
   const visibleRange = React.useMemo(() => getVisibleRange(view, anchorDate), [view, anchorDate]);
@@ -422,23 +502,37 @@ export default function CalendarPage() {
     }
     const settingsBody = (await settingsRes.json().catch(() => ({}))) as SettingsResponse;
     const settings = settingsBody?.settings || {};
+    const recurringFromSettings = normalizeRecurringBlockRules(
+      settings.calendar_blockout_recurring ?? settings.calendar_blockout_ranges
+    );
+    const fallbackLegacyRecurring =
+      recurringFromSettings.length > 0
+        ? recurringFromSettings
+        : normalizeRecurringBlockRules([
+            {
+              kind: "weekly",
+              weekdays: normalizeWeekdayList(settings.calendar_blockout_weekdays),
+              all_day: !!settings.calendar_blockout_all_day,
+              start_hm: String(settings.calendar_blockout_start || "09:00"),
+              end_hm: String(settings.calendar_blockout_end || "17:00"),
+            },
+          ]);
     const nextRules: CalendarRulesSnapshot = {
       maxConcurrent: String(settings.calendar_max_concurrent_bookings || 1),
       overlapWindow: String(settings.calendar_overlap_window_minutes || 30),
       blockoutEnabled: !!settings.calendar_blockout_enabled,
-      blockoutWeekdays: normalizeWeekdayList(settings.calendar_blockout_weekdays),
-      blockoutAllDay: !!settings.calendar_blockout_all_day,
-      blockoutStart: String(settings.calendar_blockout_start || "09:00"),
-      blockoutEnd: String(settings.calendar_blockout_end || "17:00"),
+      blockoutRecurring: fallbackLegacyRecurring,
       blockoutRanges: normalizeBlockoutRanges(settings.calendar_blockout_ranges),
     };
     setMaxConcurrent(nextRules.maxConcurrent);
     setOverlapWindow(nextRules.overlapWindow);
     setBlockoutEnabled(nextRules.blockoutEnabled);
-    setBlockoutWeekdays(nextRules.blockoutWeekdays);
-    setBlockoutAllDay(nextRules.blockoutAllDay);
-    setBlockoutStart(nextRules.blockoutStart);
-    setBlockoutEnd(nextRules.blockoutEnd);
+    setBlockoutRecurring(nextRules.blockoutRecurring);
+    const firstRecurring = nextRules.blockoutRecurring[0];
+    setBlockoutWeekdays(firstRecurring?.weekdays || []);
+    setBlockoutAllDay(!!firstRecurring?.all_day);
+    setBlockoutStart(firstRecurring?.start_hm || "09:00");
+    setBlockoutEnd(firstRecurring?.end_hm || "17:00");
     setBlockoutRanges(nextRules.blockoutRanges);
     setSavedRules(nextRules);
   }, []);
@@ -484,21 +578,23 @@ export default function CalendarPage() {
     setError("");
     setSuccess("");
     try {
-      if (blockoutEnabled && blockoutWeekdays.length === 0 && blockoutRanges.length === 0) {
+      if (blockoutEnabled && blockoutRecurring.length === 0 && blockoutRanges.length === 0) {
         throw new Error("Add at least one recurring weekday or one specific date block.");
       }
-      if (blockoutTimeInvalid) {
-        throw new Error("Blockout end time must be after start time.");
+      if (recurringDraftInvalid) {
+        throw new Error("Recurring block draft has invalid time. Fix it or clear weekdays before saving.");
       }
+      const normalizedRecurring = normalizeRecurringBlockRules(blockoutRecurring);
+      const primaryRecurring = normalizedRecurring[0] || null;
       const body = {
         calendar_max_concurrent_bookings: Number(maxConcurrent || 1),
         calendar_overlap_window_minutes: Number(overlapWindow || 30),
         calendar_blockout_enabled: blockoutEnabled,
-        calendar_blockout_weekdays: blockoutWeekdays,
-        calendar_blockout_all_day: blockoutAllDay,
-        calendar_blockout_start: blockoutStart,
-        calendar_blockout_end: blockoutEnd,
-        calendar_blockout_ranges: blockoutRanges,
+        calendar_blockout_weekdays: primaryRecurring?.weekdays || [],
+        calendar_blockout_all_day: !!primaryRecurring?.all_day,
+        calendar_blockout_start: primaryRecurring?.start_hm || "",
+        calendar_blockout_end: primaryRecurring?.end_hm || "",
+        calendar_blockout_ranges: buildCalendarBlockoutRangesPayload(blockoutRanges, normalizedRecurring),
       };
       const res = await apiFetch("/api/settings", {
         method: "PUT",
@@ -568,6 +664,33 @@ export default function CalendarPage() {
       if (prev.includes(day)) return prev.filter((d) => d !== day).sort((a, b) => a - b);
       return [...prev, day].sort((a, b) => a - b);
     });
+  }
+
+  function addRecurringBlockoutRule() {
+    setError("");
+    if (!blockoutWeekdays.length) {
+      setError("Select at least one weekday before adding a recurring block.");
+      return;
+    }
+    if (!blockoutAllDay && (!blockoutStart || !blockoutEnd || blockoutStart >= blockoutEnd)) {
+      setError("Recurring block end time must be after start time.");
+      return;
+    }
+    const nextRule: RecurringBlockRule = {
+      weekdays: [...blockoutWeekdays].sort((a, b) => a - b),
+      all_day: !!blockoutAllDay,
+      start_hm: blockoutAllDay ? "" : normalizeHm(blockoutStart),
+      end_hm: blockoutAllDay ? "" : normalizeHm(blockoutEnd),
+    };
+    setBlockoutRecurring((prev) => normalizeRecurringBlockRules([...prev, nextRule]));
+    setBlockoutWeekdays([]);
+    setBlockoutAllDay(false);
+    setBlockoutStart("09:00");
+    setBlockoutEnd("17:00");
+  }
+
+  function removeRecurringBlockoutRule(index: number) {
+    setBlockoutRecurring((prev) => prev.filter((_, i) => i !== index));
   }
 
   function addSpecificBlockoutRange() {
@@ -855,15 +978,20 @@ export default function CalendarPage() {
                 AI and manual booking will not set appointments during blocked days/times.
               </p>
               <div className="mt-3 rounded border border-border/70 bg-background/35 px-3 py-2 text-xs text-muted-foreground">
-                <div>Recurring weekdays: {formatWeekdaySummary(blockoutWeekdays)}</div>
-                <div className="mt-1">
-                  Recurring time: {blockoutAllDay ? "All day" : `${blockoutStart} - ${blockoutEnd}`}
-                </div>
+                <div>Recurring blocks: {blockoutRecurring.length}</div>
+                {blockoutRecurring.length > 0 ? (
+                  <div className="mt-1 space-y-1">
+                    {blockoutRecurring.slice(0, 3).map((rule, idx) => (
+                      <div key={`summary-recurring-${idx}`}>{formatRecurringRuleLabel(rule)}</div>
+                    ))}
+                    {blockoutRecurring.length > 3 ? <div>+{blockoutRecurring.length - 3} more</div> : null}
+                  </div>
+                ) : null}
                 <div className="mt-1">Specific date blocks: {blockoutRanges.length}</div>
               </div>
               <div className="mt-3 rounded border border-border/70 bg-background/35 p-2">
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Saved Blockout List
+                  Saved Specific Date Block List
                 </div>
                 <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
                   {blockoutRanges.length === 0 ? (
@@ -899,7 +1027,7 @@ export default function CalendarPage() {
               <button
                 type="button"
                 onClick={() => saveRules("blockout")}
-                disabled={savingRules || !blockoutDirty || blockoutMissingDays || blockoutTimeInvalid}
+                disabled={savingRules || !blockoutDirty || blockoutMissingDays || recurringDraftInvalid}
                 className="mt-2 w-full rounded border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
               >
                 {savingRules ? "Saving..." : "Save blockout changes"}
@@ -961,7 +1089,7 @@ export default function CalendarPage() {
               </button>
 
               <div className="mt-3">
-                <div className="mb-1 text-xs text-muted-foreground">Choose weekdays to block</div>
+                <div className="mb-1 text-xs text-muted-foreground">Choose weekdays to block for this recurring rule</div>
                 <div className="flex flex-wrap gap-2">
                   {BLOCKOUT_DAY_PILLS.map((day) => {
                     const active = blockoutWeekdays.includes(day.key);
@@ -1017,7 +1145,7 @@ export default function CalendarPage() {
                 Block all day on selected weekdays
               </label>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <label className="text-xs text-muted-foreground">
                   Start
                   <input
@@ -1038,6 +1166,39 @@ export default function CalendarPage() {
                     className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
                   />
                 </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={addRecurringBlockoutRule}
+                    className="w-full rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/25"
+                  >
+                    Add block
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 max-h-44 space-y-2 overflow-y-auto pr-1">
+                {blockoutRecurring.length === 0 ? (
+                  <div className="rounded border border-border/60 bg-background/35 px-2 py-2 text-xs text-muted-foreground">
+                    No recurring weekday blocks added.
+                  </div>
+                ) : (
+                  blockoutRecurring.map((rule, idx) => (
+                    <div
+                      key={`recurring-${rule.weekdays.join(",")}-${rule.start_hm}-${rule.end_hm}-${idx}`}
+                      className="flex items-center justify-between gap-2 rounded border border-border/60 bg-background/35 px-2 py-2"
+                    >
+                      <div className="text-xs text-foreground">{formatRecurringRuleLabel(rule)}</div>
+                      <button
+                        type="button"
+                        onClick={() => removeRecurringBlockoutRule(idx)}
+                        className="rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-200 hover:bg-rose-500/20"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -1117,8 +1278,8 @@ export default function CalendarPage() {
             {blockoutMissingDays ? (
               <div className="mt-3 text-[11px] text-amber-300">Enable recurring blockout only if weekdays are selected, or add a specific date-time block.</div>
             ) : null}
-            {blockoutTimeInvalid ? (
-              <div className="mt-2 text-[11px] text-amber-300">Recurring end time must be after start time.</div>
+            {recurringDraftInvalid ? (
+              <div className="mt-2 text-[11px] text-amber-300">Recurring draft end time must be after start time.</div>
             ) : null}
 
             <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
@@ -1132,7 +1293,7 @@ export default function CalendarPage() {
               <button
                 type="button"
                 onClick={() => saveRules("blockout")}
-                disabled={savingRules || !blockoutDirty || blockoutMissingDays || blockoutTimeInvalid}
+                disabled={savingRules || !blockoutDirty || blockoutMissingDays || recurringDraftInvalid}
                 className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/25 disabled:opacity-60"
               >
                 {savingRules ? "Saving..." : "Save blockout"}
